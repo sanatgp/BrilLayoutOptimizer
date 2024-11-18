@@ -1,0 +1,154 @@
+{
+  "functions": [{
+    "name": "extended_matmul",
+    "args": [
+      {"name": "A", "type": {"ptr": "int"}},
+      {"name": "B", "type": {"ptr": "int"}},
+      {"name": "C", "type": {"ptr": "int"}},
+      {"name": "D", "type": {"ptr": "int"}},
+      {"name": "n", "type": "int"}
+    ],
+    "instrs": [
+      {
+        "op": "alloc",
+        "dest": "temp1",
+        "type": {
+          "ptr": "int",
+          "size": [1024, 1024]
+        }
+      },
+      {
+        "op": "alloc",
+        "dest": "temp2",
+        "type": {
+          "ptr": "int",
+          "size": [1024, 1024]
+        }
+      },
+      {
+        "op": "loop",
+        "args": ["i", "n"],
+        "body": {
+          "instrs": [
+            {
+              "op": "loop",
+              "args": ["j", "n"],
+              "body": {
+                "instrs": [
+                  {
+                    "op": "store",
+                    "args": ["temp1", "0"]
+                  },
+                  {
+                    "op": "store",
+                    "args": ["temp2", "0"]
+                  },
+                  {
+                    "op": "loop",
+                    "args": ["k", "n"],
+                    "body": {
+                      "instrs": [
+                        {
+                          "op": "load",
+                          "dest": "aval",
+                          "args": ["A", "i * n + k"]
+                        },
+                        {
+                          "op": "load",
+                          "dest": "bval",
+                          "args": ["B", "k * n + j"]
+                        },
+                        {
+                          "op": "load",
+                          "dest": "dval",
+                          "args": ["D", "i * n + k"]
+                        },
+                        {
+                          "op": "mul",
+                          "dest": "prod1",
+                          "args": ["aval", "bval"]
+                        },
+                        {
+                          "op": "mul",
+                          "dest": "prod2",
+                          "args": ["dval", "bval"]
+                        },
+                        {
+                          "op": "load",
+                          "dest": "sum1",
+                          "args": ["temp1", "i * n + j"]
+                        },
+                        {
+                          "op": "load",
+                          "dest": "sum2",
+                          "args": ["temp2", "i * n + j"]
+                        },
+                        {
+                          "op": "add",
+                          "dest": "newsum1",
+                          "args": ["sum1", "prod1"]
+                        },
+                        {
+                          "op": "add",
+                          "dest": "newsum2",
+                          "args": ["sum2", "prod2"]
+                        },
+                        {
+                          "op": "store",
+                          "args": ["temp1", "i * n + j", "newsum1"]
+                        },
+                        {
+                          "op": "store",
+                          "args": ["temp2", "i * n + j", "newsum2"]
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "op": "load",
+                    "dest": "res1",
+                    "args": ["temp1", "i * n + j"]
+                  },
+                  {
+                    "op": "load",
+                    "dest": "res2",
+                    "args": ["temp2", "i * n + j"]
+                  },
+                  {
+                    "op": "add",
+                    "dest": "final_result",
+                    "args": ["res1", "res2"]
+                  },
+                  {
+                    "op": "store",
+                    "args": ["C", "i * n + j", "final_result"]
+                  },
+                  {
+                    "op": "if",
+                    "args": ["final_result"],
+                    "then": {
+                      "instrs": [
+                        {
+                          "op": "store",
+                          "args": ["C", "i * n + j", "0"]
+                        }
+                      ]
+                    },
+                    "else": {
+                      "instrs": [
+                        {
+                          "op": "store",
+                          "args": ["C", "i * n + j", "final_result"]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }]
+}

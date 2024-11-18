@@ -4,135 +4,10 @@ from typing import Dict, List, Set
 import copy
 from data_structures import *
 from analysis import DataLayoutAnalyzer
-
-class LayoutOptimizer:
-    """Applies data layout optimizations to Bril code."""
-    
-    def __init__(self, analyzer: DataLayoutAnalyzer):
-        self.analyzer = analyzer
-        self.TILE_SIZE = 32 
-        
-    def optimize(self, func: BrilFunction) -> BrilFunction:
-        """
-        Apply layout optimizations to a function.
-        Returns optimized function.
-        """
-        patterns = self.analyzer.analyze_function(func)
-        optimized_func = copy.deepcopy(func)
-        
-        self._apply_loop_interchange(optimized_func, patterns)
-        self._apply_loop_tiling(optimized_func, patterns)
-        
-        return optimized_func
-    
-    def _apply_loop_interchange(self, func: BrilFunction, 
-                              patterns: Dict[str, ArrayInfo]):
-        """Apply loop interchange optimization for better locality."""
-        interchangeable_loops = self._find_interchangeable_loops(func.instrs, patterns)
-        
-        for loop_pair in interchangeable_loops:
-            self._interchange_loop_pair(loop_pair[0], loop_pair[1])
-    
-    def _find_interchangeable_loops(self, instrs: List[Dict], 
-                                  patterns: Dict[str, ArrayInfo]) -> List[tuple]:
-        """Find pairs of loops that can be interchanged for better locality."""
-        result = []
-        
-        for i, instr in enumerate(instrs[:-1]):
-            if instr.get("op") == "loop":
-                next_instr = instrs[i + 1]
-                if next_instr.get("op") == "loop":
-                    if self._should_interchange(instr, next_instr, patterns):
-                        result.append((instr, next_instr))
-        
-        return result
-    
-    def _should_interchange(self, loop1: Dict, loop2: Dict, 
-                          patterns: Dict[str, ArrayInfo]) -> bool:
-        """Determine if interchanging two loops would improve locality."""
-        # Simple heuristic: interchange if we detect column-major access
-        body_instrs = loop2.get("body", {}).get("instrs", [])
-        for instr in body_instrs:
-            if instr.get("op") in ["load", "store"]:
-                array_name = instr.get("args", [""])[0]
-                if array_name in patterns:
-                    if patterns[array_name].access_pattern == AccessPattern.COLUMN_MAJOR:
-                        return True
-        return False
-    
-    def _interchange_loop_pair(self, loop1: Dict, loop2: Dict):
-        """Perform loop interchange transformation."""
-        loop1["args"], loop2["args"] = loop2["args"], loop1["args"]
-        
-        self._adjust_indices_after_interchange(loop1["body"], loop1["args"][0], 
-                                            loop2["args"][0])
-        self._adjust_indices_after_interchange(loop2["body"], loop2["args"][0], 
-                                            loop1["args"][0])
-    
-    def _adjust_indices_after_interchange(self, body: Dict, old_var: str, 
-                                        new_var: str):
-        """Adjust array indices after loop interchange."""
-        for instr in body.get("instrs", []):
-            if instr.get("op") in ["load", "store"]:
-                args = instr.get("args", [])
-                if len(args) > 1:
-                    index_expr = args[1]
-                    if isinstance(index_expr, str):
-                        args[1] = index_expr.replace(old_var, new_var)
-    
-    def _apply_loop_tiling(self, func: BrilFunction, 
-                          patterns: Dict[str, ArrayInfo]):
-        """Apply loop tiling optimization."""
-        for i, instr in enumerate(func.instrs):
-            if instr.get("op") == "loop":
-                if self._should_tile_loop(instr, patterns):
-                    func.instrs[i] = self._create_tiled_loop(instr)
-    
-    def _should_tile_loop(self, loop: Dict, patterns: Dict[str, ArrayInfo]) -> bool:
-        """Determine if a loop should be tiled."""
-        body_instrs = loop.get("body", {}).get("instrs", [])
-        for instr in body_instrs:
-            if instr.get("op") in ["load", "store"]:
-                array_name = instr.get("args", [""])[0]
-                if array_name in patterns:
-                    pattern = patterns[array_name].access_pattern
-                    if pattern in [AccessPattern.COLUMN_MAJOR, AccessPattern.STRIDED]:
-                        return True
-        return False
-    
-    def _create_tiled_loop(self, original_loop: Dict) -> Dict:
-        """Create a tiled version of a loop."""
-        args = original_loop.get("args", [])
-        if len(args) < 2:
-            return original_loop
-            
-        loop_var = args[0]
-        end = args[1]
-        
-        tile_loop = {
-            "op": "loop",
-            "args": [f"{loop_var}_tile", 0, end, self.TILE_SIZE],
-            "body": {
-                "instrs": [
-                    {
-                        "op": "loop",
-                        "args": [
-                            loop_var,
-                            f"{loop_var}_tile",
-                            f"min({loop_var}_tile + {self.TILE_SIZE}, {end})",
-                            1
-                        ],
-                        "body": original_loop["body"]
-                    }
-                ]
-            }
-        }
-        
-        return tile_loop
+from cache_info import CacheInfo
 
 class OptimizationPass:
     """Base class for optimization passes."""
-    
     def __init__(self):
         self.changed = False
     
@@ -141,12 +16,10 @@ class OptimizationPass:
         raise NotImplementedError
         
     def did_change(self) -> bool:
-        """Return whether the pass made any changes."""
         return self.changed
 
 class LoopFusion(OptimizationPass):
     """Fuse adjacent compatible loops."""
-    
     def run(self, func: BrilFunction) -> BrilFunction:
         self.changed = False
         new_instrs = []
@@ -158,6 +31,7 @@ class LoopFusion(OptimizationPass):
                 new_instrs.append(self._fuse_loops(func.instrs[i], func.instrs[i + 1]))
                 i += 2
                 self.changed = True
+                print("Fused adjacent loops")
             else:
                 new_instrs.append(func.instrs[i])
                 i += 1
@@ -166,7 +40,6 @@ class LoopFusion(OptimizationPass):
         return func
     
     def _can_fuse_loops(self, loop1: Dict, loop2: Dict) -> bool:
-        """Check if two loops can be fused."""
         if loop1.get("op") != "loop" or loop2.get("op") != "loop":
             return False
             
@@ -180,14 +53,11 @@ class LoopFusion(OptimizationPass):
                 self._no_dependencies(loop1["body"], loop2["body"]))
     
     def _no_dependencies(self, body1: Dict, body2: Dict) -> bool:
-        """Check if there are no dependencies between loop bodies."""
         writes1 = self._get_modified_vars(body1)
         reads2 = self._get_read_vars(body2)
-        
         return not (writes1 & reads2)
     
     def _get_modified_vars(self, body: Dict) -> Set[str]:
-        """Get variables modified in a loop body."""
         modified = set()
         for instr in body.get("instrs", []):
             if "dest" in instr:
@@ -197,7 +67,6 @@ class LoopFusion(OptimizationPass):
         return modified
     
     def _get_read_vars(self, body: Dict) -> Set[str]:
-        """Get variables read in a loop body."""
         reads = set()
         for instr in body.get("instrs", []):
             if "args" in instr:
@@ -206,11 +75,9 @@ class LoopFusion(OptimizationPass):
         return reads
     
     def _fuse_loops(self, loop1: Dict, loop2: Dict) -> Dict:
-        """Fuse two compatible loops."""
         fused_body = {
             "instrs": (loop1["body"]["instrs"] + loop2["body"]["instrs"])
         }
-        
         return {
             "op": "loop",
             "args": loop1["args"],
@@ -219,10 +86,9 @@ class LoopFusion(OptimizationPass):
 
 class ArrayPadding(OptimizationPass):
     """Add padding to arrays to avoid cache conflicts."""
-    
-    def __init__(self, cache_line_size: int = 64):
+    def __init__(self, cache_info: CacheInfo):
         super().__init__()
-        self.cache_line_size = cache_line_size
+        self.cache_line_size = cache_info.line_size
     
     def run(self, func: BrilFunction) -> BrilFunction:
         self.changed = False
@@ -230,7 +96,10 @@ class ArrayPadding(OptimizationPass):
         
         for instr in func.instrs:
             if instr.get("op") == "alloc":
-                new_instrs.append(self._pad_allocation(instr))
+                padded_instr = self._pad_allocation(instr)
+                if padded_instr != instr:
+                    print(f"Applied padding to array {instr.get('dest', '')}")
+                new_instrs.append(padded_instr)
             else:
                 new_instrs.append(instr)
         
@@ -238,7 +107,6 @@ class ArrayPadding(OptimizationPass):
         return func
     
     def _pad_allocation(self, alloc_instr: Dict) -> Dict:
-        """Add padding to array allocation if beneficial."""
         type_info = alloc_instr.get("type", {})
         if not isinstance(type_info, dict) or "size" not in type_info:
             return alloc_instr
@@ -247,7 +115,7 @@ class ArrayPadding(OptimizationPass):
         if not dimensions:
             return alloc_instr
             
-        element_size = 4  # Assume 4 bytes per element
+        element_size = 4
         last_dim = dimensions[-1]
         
         elements_per_line = self.cache_line_size // element_size
@@ -268,87 +136,151 @@ class ArrayPadding(OptimizationPass):
         return alloc_instr
 
 class LayoutOptimizer:
-    """Main optimizer that combines all optimization passes."""
-    
-    def __init__(self, analyzer: DataLayoutAnalyzer):
+    """Applies data layout optimizations to Bril code."""
+    def __init__(self, analyzer: DataLayoutAnalyzer, cache_info: CacheInfo):
         self.analyzer = analyzer
+        self.cache_info = cache_info
+        self.TILE_SIZE = self._calculate_optimal_tile_size()
         self.passes = [
             LoopFusion(),
-            ArrayPadding(),
+            ArrayPadding(cache_info),
         ]
     
-    def optimize(self, func: BrilFunction) -> BrilFunction:
-        """Run all optimization passes until convergence."""
-        patterns = self.analyzer.analyze_function(func)
-        optimized = copy.deepcopy(func)
+    def _calculate_optimal_tile_size(self):
+        cache_size = self.cache_info.l1_size
+        element_size = 8
+        block_elements = (cache_size // (3 * element_size))
+        tile_size = int(block_elements ** 0.5)
+        cache_line_elements = self.cache_info.line_size // element_size
+        return max(8, (tile_size // cache_line_elements) * cache_line_elements)
         
+    def optimize(self, func: BrilFunction) -> BrilFunction:
+        print("Starting optimization...")
+        patterns = self.analyzer.analyze_function(func)
+        print(f"Detected patterns: {patterns}")
+        optimized = copy.deepcopy(func)
+    
         changed = True
-        while changed:
+        iteration = 0
+        while changed and iteration < 10:
+            print(f"Optimization iteration {iteration}")
             changed = False
+            
             for opt_pass in self.passes:
                 optimized = opt_pass.run(optimized)
-                changed |= opt_pass.did_change()
-                
-            optimized = self._apply_layout_optimizations(optimized, patterns)
+                if opt_pass.did_change():
+                    print(f"Pass {opt_pass.__class__.__name__} made changes")
+                    changed = True
+            
+            old_instrs = str(optimized.instrs)
+            self.changed = False #reset flag
+            optimized = self._apply_loop_interchange(optimized, patterns)
+            optimized = self._apply_loop_tiling(optimized, patterns)
+            if self.changed:
+                print("Loop transformations applied")
+                changed = True
+            
+            iteration += 1
         
         return optimized
     
-    def _apply_layout_optimizations(self, func: BrilFunction,
-                                  patterns: Dict[str, ArrayInfo]) -> BrilFunction:
-        """Apply layout-specific optimizations."""
-        func = self._apply_loop_transformations(func, patterns)
-        
-        func = self._apply_data_transformations(func, patterns)
-        
-        return func
-    
     def _apply_loop_transformations(self, func: BrilFunction,
                                   patterns: Dict[str, ArrayInfo]) -> BrilFunction:
-        """Apply loop transformations for better locality."""
-        # Implement loop interchange and tiling
-        for i, instr in enumerate(func.instrs):
-            if instr.get("op") == "loop":
-                if i + 1 < len(func.instrs) and func.instrs[i + 1].get("op") == "loop":
-                    if self._should_interchange(instr, func.instrs[i + 1], patterns):
-                        func.instrs[i], func.instrs[i + 1] = (
-                            func.instrs[i + 1], func.instrs[i]
-                        )
-                
-                if self._should_tile(instr, patterns):
-                    func.instrs[i] = self._create_tiled_loop(instr)
-        
+        """Apply loop tiling and interchange transformations."""
+        func = self._apply_loop_interchange(func, patterns)
+        func = self._apply_loop_tiling(func, patterns)
         return func
     
-    def _apply_data_transformations(self, func: BrilFunction,
-                                  patterns: Dict[str, ArrayInfo]) -> BrilFunction:
-        """Apply data layout transformations."""
-
-        return func 
-
+    def _apply_loop_interchange(self, func: BrilFunction, patterns: Dict[str, ArrayInfo]) -> BrilFunction:
+        """Perform loop interchange optimization."""
+        self.changed = False
+        
+        def interchange_loops(instrs):
+            for i in range(len(instrs)):
+                instr = instrs[i]
+                if instr.get("op") == "loop":
+                    body_instrs = instr.get("body", {}).get("instrs", [])
+                    #interchange this loop with its inner loop
+                    if body_instrs and body_instrs[0].get("op") == "loop":
+                        inner_loop = body_instrs[0]
+                        if self._should_interchange(instr, inner_loop, patterns):
+                            print(f"Interchanging loops {instr.get('args', [''])[0]} and {inner_loop.get('args', [''])[0]}")
+                            # Swap loops
+                            instrs[i] = inner_loop
+                            inner_loop["body"]["instrs"] = [instr]
+                            self._adjust_indices_after_interchange(instr["body"], instr["args"][0], inner_loop["args"][0])
+                            self._adjust_indices_after_interchange(inner_loop["body"], inner_loop["args"][0], instr["args"][0])
+                            self.changed = True
+                    interchange_loops(instr.get("body", {}).get("instrs", []))
+        interchange_loops(func.instrs)
+        return func
+    
+    def _apply_loop_tiling(self, func: BrilFunction, patterns: Dict[str, ArrayInfo]) -> BrilFunction:
+        """Apply loop tiling transformation."""
+        self.changed = False
+        
+        def tile_loops(instrs):
+            new_instrs = []
+            for instr in instrs:
+                if instr.get("op") == "loop":
+                    instr["body"]["instrs"] = tile_loops(instr.get("body", {}).get("instrs", []))
+                    if self._should_tile_loop(instr, patterns):
+                        print(f"Applying tiling to loop {instr.get('args', [''])[0]}")
+                        new_instrs.append(self._create_tiled_loop(instr))
+                        self.changed = True
+                    else:
+                        new_instrs.append(instr)
+                else:
+                    new_instrs.append(instr)
+            return new_instrs
+        func.instrs = tile_loops(func.instrs)
+        return func
+    
     def _should_interchange(self, loop1: Dict, loop2: Dict,
                           patterns: Dict[str, ArrayInfo]) -> bool:
-        """Determine if loops should be interchanged."""
+        """Determine if loops should be interchanged for better locality."""
+        if loop1.get("op") != "loop" or loop2.get("op") != "loop":
+            return False
+        
         body_instrs = loop2.get("body", {}).get("instrs", [])
         for instr in body_instrs:
             if instr.get("op") in ["load", "store"]:
                 array_name = instr.get("args", [""])[0]
                 if array_name in patterns:
-                    if patterns[array_name].access_pattern == AccessPattern.COLUMN_MAJOR:
+                    pattern = patterns[array_name].access_pattern
+                    if pattern == AccessPattern.COLUMN_MAJOR:
                         return True
         return False
     
-    def _should_tile(self, loop: Dict, patterns: Dict[str, ArrayInfo]) -> bool:
+    def _should_tile_loop(self, loop: Dict, patterns: Dict[str, ArrayInfo]) -> bool:
         """Determine if loop should be tiled."""
-        # Check if loop has intensive array accesses
         body_instrs = loop.get("body", {}).get("instrs", [])
-        array_accesses = sum(1 for instr in body_instrs 
-                           if instr.get("op") in ["load", "store"])
-        return array_accesses > 5  # Arbitrary threshold
+        
+        has_inner_loop = any(instr.get("op") == "loop" for instr in body_instrs)
+        if not has_inner_loop:
+            return False
+        
+        for instr in body_instrs:
+            if instr.get("op") in ["load", "store"]:
+                array_name = instr.get("args", [""])[0]
+                if array_name in patterns:
+                    pattern = patterns[array_name].access_pattern
+                    if pattern in [AccessPattern.COLUMN_MAJOR, AccessPattern.STRIDED]:
+                        return True
+        return False
+    
+    def _adjust_indices_after_interchange(self, body: Dict, old_var: str, new_var: str):
+        """Update array indices after loop interchange."""
+        for instr in body.get("instrs", []):
+            if instr.get("op") in ["load", "store"]:
+                args = instr.get("args", [])
+                if len(args) > 1:
+                    index_expr = args[1]
+                    if isinstance(index_expr, str):
+                        args[1] = index_expr.replace(old_var, new_var)
     
     def _create_tiled_loop(self, original_loop: Dict) -> Dict:
         """Create a tiled version of a loop."""
-        TILE_SIZE = 32  # Could be tuned based on cache size
-        
         args = original_loop.get("args", [])
         if len(args) < 2:
             return original_loop
@@ -358,7 +290,7 @@ class LayoutOptimizer:
         
         return {
             "op": "loop",
-            "args": [f"{loop_var}_tile", 0, end, TILE_SIZE],
+            "args": [f"{loop_var}_tile", "0", end, str(self.TILE_SIZE)],
             "body": {
                 "instrs": [
                     {
@@ -366,8 +298,8 @@ class LayoutOptimizer:
                         "args": [
                             loop_var,
                             f"{loop_var}_tile",
-                            f"min({loop_var}_tile + {TILE_SIZE}, {end})",
-                            1
+                            f"min({loop_var}_tile + {self.TILE_SIZE}, {end})",
+                            "1"
                         ],
                         "body": original_loop["body"]
                     }

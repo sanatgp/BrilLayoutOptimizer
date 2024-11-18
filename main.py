@@ -8,6 +8,7 @@ from typing import Dict, Any, Union
 from data_structures import BrilFunction, BrilType, BrilArgument
 from analysis import DataLayoutAnalyzer
 from optimization import LayoutOptimizer
+from cache_info import CacheInfo
 
 def setup_logging(verbose: bool):
     """Setup logging configuration."""
@@ -66,6 +67,7 @@ def main():
     parser = argparse.ArgumentParser(description="Bril Data Layout Optimizer")
     parser.add_argument("input", nargs="?", type=argparse.FileType("r"), 
                        default=sys.stdin, help="Input Bril JSON file")
+    parser.add_argument("--cache-size", type=int, help="Override cache size in bytes")
     parser.add_argument("-o", "--output", type=argparse.FileType("w"), 
                        default=sys.stdout, help="Output file")
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -79,8 +81,13 @@ def main():
         program = json.load(args.input)
         
         logging.debug("Initializing optimizer components...")
+        cache_info = CacheInfo()
+        if args.cache_size:
+            cache_info.l1_size = args.cache_size
+            
         analyzer = DataLayoutAnalyzer()
-        optimizer = LayoutOptimizer(analyzer)
+        optimizer = LayoutOptimizer(analyzer, cache_info)  # Pass cache_info
+        
         
         logging.debug("Processing functions...")
         optimized_program = {"functions": []}

@@ -5,44 +5,37 @@ from collections import defaultdict
 from data_structures import *
 
 class IndexExpressionParser:
-    """Parses array index expressions to determine access patterns."""
-    
-    def __init__(self):
-        self.loop_vars = set()
-        
-    def parse(self, expr: str) -> Tuple[List[str], int]:
-        """
-        Parse an index expression to extract loop variables and stride.
-        Returns (list of variables, computed stride)
-        """
+    def parse(self, expr: str) -> Tuple[List[str], Dict[str, int]]:
         try:
-            terms = expr.replace(' ', '').split('+')
-            coefficients = []
-            vars_found = []
-            
+            if not isinstance(expr, str):
+                return [], {}
+
+            expr = expr.replace(' ', '')
+            terms = expr.split('+')
+            var_strides = {}
+
             for term in terms:
-                if '*' in term:
-                    coef_str, var = term.split('*')
-                    try:
-                        coef = int(coef_str)
-                    except ValueError:
-                        coef = 1
-                    coefficients.append(coef)
-                    vars_found.append(var)
-                else:
-                    coefficients.append(1)
-                    vars_found.append(term)
-            
-            # Calculate stride based on coefficients
-            stride = max(coefficients) if coefficients else 1
-            return vars_found, stride
+                factors = term.split('*')
+                stride = 1
+                var = None
+                for factor in factors:
+                    if factor.isdigit():
+                        stride *= int(factor)
+                    elif factor == 'n':
+                        stride *= 1024  # Lets assume n = 1024 for simplicity
+                    else:
+                        var = factor
+                if var is not None:
+                    var_strides[var] = stride
+
+            return list(var_strides.keys()), var_strides
+
         except Exception as e:
             print(f"Warning: Failed to parse index expression '{expr}': {e}")
-            return [], 1
+            return [], {}
+
 
 class DataLayoutAnalyzer:
-    """Analyzes memory access patterns in Bril code."""
-    
     def __init__(self):
         self.array_info: Dict[str, ArrayInfo] = {}
         self.memory_accesses: List[MemoryAccess] = []
@@ -50,40 +43,45 @@ class DataLayoutAnalyzer:
         self.expr_parser = IndexExpressionParser()
     
     def analyze_function(self, func: BrilFunction) -> Dict[str, ArrayInfo]:
-        """
-        Analyze memory access patterns in a function.
-        Returns dictionary mapping array names to their analysis info.
-        """
+        print("\nStarting memory access pattern analysis...")
         self._reset_analysis()
         self._collect_array_declarations(func)
         self._analyze_memory_accesses(func.instrs)
-        return self._determine_access_patterns()
+        patterns = self._determine_access_patterns()
+        
+        for name, info in patterns.items():
+            print(f"\nArray {name}:")
+            print(f"  Dimensions: {info.dimensions}")
+            print(f"  Total accesses: {info.total_accesses}")
+            print(f"  Stride pattern: {info.stride_pattern}")
+            print(f"  Access pattern: {info.access_pattern}")
+            if info.access_pattern == AccessPattern.RANDOM:
+                print(f"  Warning: Array {name} was detected as RANDOM access pattern")
+        
+        return patterns
     
     def _reset_analysis(self):
-        """Reset the analyzer state for a new function."""
         self.array_info.clear()
         self.memory_accesses.clear()
         self.loop_nest_info.clear()
     
     def _collect_array_declarations(self, func: BrilFunction):
-        """Collect information about array declarations in the function."""
-        # Check arguments for array parameters
         for arg in func.args:
             if arg.type.ptr:
                 self.array_info[arg.name] = ArrayInfo(
-                    dimensions=[],  # Unknown dimensions for parameters
+                    dimensions=[1024, 1024],
                     access_pattern=AccessPattern.RANDOM,
                     total_accesses=0,
                     stride_pattern=[],
                     element_type=arg.type.base
                 )
+                print(f"Registered array argument: {arg.name}")
         
-        # Check function body for array allocations
         for instr in func.instrs:
             if instr.get("op") == "alloc":
                 name = instr.get("dest")
                 type_info = instr.get("type", {})
-                dimensions = type_info.get("size", [])
+                dimensions = type_info.get("size", [1024, 1024])
                 element_type = type_info.get("element", "int")
                 
                 self.array_info[name] = ArrayInfo(
@@ -93,57 +91,82 @@ class DataLayoutAnalyzer:
                     stride_pattern=[],
                     element_type=element_type
                 )
+                print(f"Registered allocated array: {name} with dimensions {dimensions}")
     
     def _analyze_memory_accesses(self, instrs: List[Dict], loop_depth: int = 0, 
                                current_loop: Optional[LoopInfo] = None):
-        """Analyze memory access patterns within a sequence of instructions."""
         for instr in instrs:
             op = instr.get("op")
             
             if op in ["load", "store"]:
-                access = self._parse_memory_access(instr, loop_depth, current_loop)
-                if access:
-                    self.memory_accesses.append(access)
+                args = instr.get("args", [])
+                if len(args) >= 2:
+                    array_name = args[0]
+                    index_expr = str(args[1])
+                    print(f"Analyzing array access: {array_name}[{index_expr}]")
+
+                    loop_vars, var_strides = self.expr_parser.parse(index_expr)
+                    access = MemoryAccess(
+                        variable=array_name,
+                        index_expr=index_expr,
+                        line_number=instr.get("pos", {}).get("line", 0),
+                        loop_depth=loop_depth,
+                        stride=0, 
+                        loop_vars=loop_vars
+                    )
+
+                    if current_loop:
+                        innermost_var = current_loop.var
+                        access.stride = var_strides.get(innermost_var, 0)
+                    else:
+                        access.stride = 0 
+
+                    if array_name in self.array_info:
+                        self.memory_accesses.append(access)
+                        self.array_info[array_name].total_accesses += 1
+                        self.array_info[array_name].stride_pattern.append(access.stride)
+                        print(f"Recorded {array_name} access with stride {access.stride}")
             
             elif op == "loop":
                 loop_info = self._parse_loop_info(instr, loop_depth, current_loop)
                 self.loop_nest_info[loop_depth] = loop_info
-                self._analyze_memory_accesses(
-                    loop_info.body.get("instrs", []), 
-                    loop_depth + 1, 
-                    loop_info
-                )
+                if "body" in instr:
+                    self._analyze_memory_accesses(
+                        instr["body"].get("instrs", []),
+                        loop_depth + 1,
+                        loop_info
+                    )
+ 
+
+    def _should_tile_loop(self, loop: Dict, patterns: Dict[str, ArrayInfo]) -> bool:
+        body_instrs = loop.get("body", {}).get("instrs", [])
     
-    def _parse_memory_access(self, instr: Dict, loop_depth: int, 
-                           current_loop: Optional[LoopInfo]) -> Optional[MemoryAccess]:
-        """Parse a memory access instruction."""
-        args = instr.get("args", [])
-        if len(args) < 2:
-            return None
-            
-        var_name = args[0]
-        index_expr = str(args[1])
-        loop_vars, stride = self.expr_parser.parse(index_expr)
-        
-        return MemoryAccess(
-            variable=var_name,
-            index_expr=index_expr,
-            line_number=instr.get("pos", {}).get("line", 0),
-            loop_depth=loop_depth,
-            stride=stride,
-            loop_vars=loop_vars
-        )
+        #nested loops
+        has_inner_loop = any(instr.get("op") == "loop" for instr in body_instrs)
+        if not has_inner_loop:
+            return False
+    
+        #array accesses
+        array_patterns = []
+        for instr in body_instrs:
+            if instr.get("op") in ["load", "store"]:
+                array_name = instr.get("args", [""])[0]
+                index_expr = str(instr.get("args", ["", ""])[1])
+                if "k*n" in index_expr or "n*k" in index_expr:
+                    print(f"Found column-major access in loop: {index_expr}")
+                    return True
+    
+        return False
     
     def _parse_loop_info(self, instr: Dict, depth: int, 
                         parent: Optional[LoopInfo]) -> LoopInfo:
-        """Parse a loop instruction to extract loop information."""
         args = instr.get("args", [])
         if len(args) < 2:
             raise ValueError(f"Invalid loop instruction: missing arguments: {instr}")
         
         var = args[0]
         end = args[1]
-        start = 0  # Default values
+        start = 0
         step = 1
         
         if len(args) > 2:
@@ -163,33 +186,40 @@ class DataLayoutAnalyzer:
         )
     
     def _determine_access_patterns(self) -> Dict[str, ArrayInfo]:
-        """Determine final access patterns for arrays."""
+        print("\nDetermining access patterns...")
+        
         for access in self.memory_accesses:
             if access.variable in self.array_info:
                 array = self.array_info[access.variable]
                 array.total_accesses += 1
-                if access.stride > 0:
-                    array.stride_pattern.append(access.stride)
+                array.stride_pattern.append(access.stride)
+                print(f"Access to {access.variable}: stride {access.stride}")
         
-        for info in self.array_info.values():
+        for name, info in self.array_info.items():
+            prev_pattern = info.access_pattern
             info.access_pattern = self._classify_access_pattern(info)
+            print(f"\nArray {name} pattern analysis:")
+            print(f"  Previous pattern: {prev_pattern}")
+            print(f"  New pattern: {info.access_pattern}")
+            print(f"  Based on strides: {info.stride_pattern}")
         
         return self.array_info
     
     def _classify_access_pattern(self, info: ArrayInfo) -> AccessPattern:
-        """Classify an array's access pattern based on collected information."""
         if not info.stride_pattern:
             return AccessPattern.RANDOM
-            
-        stride_counts = defaultdict(int)
-        for stride in info.stride_pattern:
-            stride_counts[stride] += 1
-            
-        most_common_stride = max(stride_counts.items(), key=lambda x: x[1])[0]
-        
-        if most_common_stride == 1:
-            return AccessPattern.ROW_MAJOR
-        elif most_common_stride > 1:
+
+        n_accesses = len(info.stride_pattern)
+        if n_accesses == 0:
+            return AccessPattern.RANDOM
+
+        matrix_dim = info.dimensions[0] if info.dimensions else 1024
+        large_strides = sum(1 for s in info.stride_pattern if s >= matrix_dim / 2)
+        unit_strides = sum(1 for s in info.stride_pattern if s == 1)
+
+        if large_strides / n_accesses >= 0.3:
             return AccessPattern.COLUMN_MAJOR
+        elif unit_strides / n_accesses >= 0.7:
+            return AccessPattern.ROW_MAJOR
         else:
             return AccessPattern.STRIDED
