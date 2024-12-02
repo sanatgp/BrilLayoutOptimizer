@@ -69,7 +69,7 @@
                   "j_tile",
                   "0",
                   "n",
-                  "32"
+                  "48"
                 ],
                 "body": {
                   "instrs": [
@@ -79,7 +79,7 @@
                         "j_tile",
                         "0",
                         "j_tile",
-                        "32"
+                        "48"
                       ],
                       "body": {
                         "instrs": [
@@ -89,7 +89,7 @@
                               "j_tile",
                               "0",
                               "j_tile",
-                              "32"
+                              "48"
                             ],
                             "body": {
                               "instrs": [
@@ -99,7 +99,7 @@
                                     "j_tile",
                                     "0",
                                     "j_tile",
-                                    "32"
+                                    "48"
                                   ],
                                   "body": {
                                     "instrs": [
@@ -109,7 +109,7 @@
                                           "j_tile",
                                           "0",
                                           "j_tile",
-                                          "32"
+                                          "48"
                                         ],
                                         "body": {
                                           "instrs": [
@@ -119,7 +119,7 @@
                                                 "j_tile",
                                                 "0",
                                                 "j_tile",
-                                                "32"
+                                                "48"
                                               ],
                                               "body": {
                                                 "instrs": [
@@ -129,7 +129,7 @@
                                                       "j_tile",
                                                       "0",
                                                       "j_tile",
-                                                      "32"
+                                                      "48"
                                                     ],
                                                     "body": {
                                                       "instrs": [
@@ -139,7 +139,7 @@
                                                             "j_tile",
                                                             "0",
                                                             "j_tile",
-                                                            "32"
+                                                            "48"
                                                           ],
                                                           "body": {
                                                             "instrs": [
@@ -149,7 +149,7 @@
                                                                   "j_tile",
                                                                   "0",
                                                                   "j_tile",
-                                                                  "32"
+                                                                  "48"
                                                                 ],
                                                                 "body": {
                                                                   "instrs": [
@@ -159,7 +159,7 @@
                                                                         "j_tile",
                                                                         "0",
                                                                         "j_tile",
-                                                                        "32"
+                                                                        "48"
                                                                       ],
                                                                       "body": {
                                                                         "instrs": [
@@ -168,7 +168,7 @@
                                                                             "args": [
                                                                               "j",
                                                                               "j_tile",
-                                                                              "min(j_tile + 32, j_tile)",
+                                                                              "j_tile + 48",
                                                                               "1"
                                                                             ],
                                                                             "body": {

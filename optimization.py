@@ -191,16 +191,17 @@ class LayoutOptimizer:
         func = self._apply_loop_tiling(func, patterns)
         return func
     
+        
     def _apply_loop_interchange(self, func: BrilFunction, patterns: Dict[str, ArrayInfo]) -> BrilFunction:
         """Perform loop interchange optimization."""
         self.changed = False
-        
+    
         def interchange_loops(instrs):
             for i in range(len(instrs)):
                 instr = instrs[i]
                 if instr.get("op") == "loop":
                     body_instrs = instr.get("body", {}).get("instrs", [])
-                    #interchange this loop with its inner loop
+                    # Only try to interchange once at each level
                     if body_instrs and body_instrs[0].get("op") == "loop":
                         inner_loop = body_instrs[0]
                         if self._should_interchange(instr, inner_loop, patterns):
@@ -211,7 +212,13 @@ class LayoutOptimizer:
                             self._adjust_indices_after_interchange(instr["body"], instr["args"][0], inner_loop["args"][0])
                             self._adjust_indices_after_interchange(inner_loop["body"], inner_loop["args"][0], instr["args"][0])
                             self.changed = True
-                    interchange_loops(instr.get("body", {}).get("instrs", []))
+                            return  
+               
+                    for nested_instr in body_instrs:
+                        if nested_instr.get("op") == "loop":
+                            nested_body = nested_instr.get("body", {}).get("instrs", [])
+                            interchange_loops(nested_body)
+                        
         interchange_loops(func.instrs)
         return func
     
@@ -284,10 +291,10 @@ class LayoutOptimizer:
         args = original_loop.get("args", [])
         if len(args) < 2:
             return original_loop
-            
+        
         loop_var = args[0]
         end = args[1]
-        
+    
         return {
             "op": "loop",
             "args": [f"{loop_var}_tile", "0", end, str(self.TILE_SIZE)],
@@ -298,7 +305,7 @@ class LayoutOptimizer:
                         "args": [
                             loop_var,
                             f"{loop_var}_tile",
-                            f"min({loop_var}_tile + {self.TILE_SIZE}, {end})",
+                            f"{loop_var}_tile + {self.TILE_SIZE}",  # Changed this line
                             "1"
                         ],
                         "body": original_loop["body"]

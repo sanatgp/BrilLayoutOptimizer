@@ -1,0 +1,255 @@
+{
+  "test1_simple_matmul": {
+    "functions": [{
+      "name": "simple_matmul",
+      "args": [
+        {"name": "A", "type": {"ptr": "int"}},
+        {"name": "B", "type": {"ptr": "int"}},
+        {"name": "C", "type": {"ptr": "int"}},
+        {"name": "n", "type": "int"}
+      ],
+      "instrs": [
+        {
+          "op": "loop",
+          "args": ["i", "n"],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": ["j", "n"],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "loop",
+                      "args": ["k", "n"],
+                      "body": {
+                        "instrs": [
+                          {
+                            "op": "load",
+                            "dest": "aval",
+                            "args": ["A", "i * n + k"]
+                          },
+                          {
+                            "op": "load",
+                            "dest": "bval",
+                            "args": ["B", "k * n + j"]
+                          },
+                          {
+                            "op": "mul",
+                            "dest": "prod",
+                            "args": ["aval", "bval"]
+                          },
+                          {
+                            "op": "load",
+                            "dest": "sum",
+                            "args": ["C", "i * n + j"]
+                          },
+                          {
+                            "op": "add",
+                            "dest": "newsum",
+                            "args": ["sum", "prod"]
+                          },
+                          {
+                            "op": "store",
+                            "args": ["C", "i * n + j", "newsum"]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }]
+  },
+
+  "test2_adjacent_loops": {
+    "functions": [{
+      "name": "loop_fusion_candidate",
+      "args": [
+        {"name": "A", "type": {"ptr": "int"}},
+        {"name": "B", "type": {"ptr": "int"}},
+        {"name": "n", "type": "int"}
+      ],
+      "instrs": [
+        {
+          "op": "loop",
+          "args": ["i", "n"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "args": ["A", "i"]
+              },
+              {
+                "op": "add",
+                "dest": "result1",
+                "args": ["val", "1"]
+              },
+              {
+                "op": "store",
+                "args": ["A", "i", "result1"]
+              }
+            ]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["i", "n"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "args": ["B", "i"]
+              },
+              {
+                "op": "add",
+                "dest": "result2",
+                "args": ["val", "2"]
+              },
+              {
+                "op": "store",
+                "args": ["B", "i", "result2"]
+              }
+            ]
+          }
+        }
+      ]
+    }]
+  },
+
+  "test3_array_padding_candidate": {
+    "functions": [{
+      "name": "array_access",
+      "args": [
+        {"name": "n", "type": "int"}
+      ],
+      "instrs": [
+        {
+          "op": "alloc",
+          "dest": "arr",
+          "type": {
+            "ptr": "int",
+            "size": [1023]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["i", "n"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "args": ["arr", "i"]
+              },
+              {
+                "op": "store",
+                "args": ["arr", "i", "val"]
+              }
+            ]
+          }
+        }
+      ]
+    }]
+  },
+
+  "test4_column_major_access": {
+    "functions": [{
+      "name": "column_major",
+      "args": [
+        {"name": "A", "type": {"ptr": "int"}},
+        {"name": "n", "type": "int"}
+      ],
+      "instrs": [
+        {
+          "op": "loop",
+          "args": ["i", "n"],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": ["j", "n"],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "load",
+                      "dest": "val",
+                      "args": ["A", "j * n + i"]
+                    },
+                    {
+                      "op": "store",
+                      "args": ["A", "j * n + i", "val"]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }]
+  },
+
+  "test5_multiple_arrays": {
+    "functions": [{
+      "name": "multi_array",
+      "args": [
+        {"name": "n", "type": "int"}
+      ],
+      "instrs": [
+        {
+          "op": "alloc",
+          "dest": "arr1",
+          "type": {
+            "ptr": "int",
+            "size": [512, 512]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "arr2",
+          "type": {
+            "ptr": "int",
+            "size": [512, 513]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["i", "n"],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": ["j", "n"],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "load",
+                      "dest": "val1",
+                      "args": ["arr1", "i * n + j"]
+                    },
+                    {
+                      "op": "load",
+                      "dest": "val2",
+                      "args": ["arr2", "j * n + i"]
+                    },
+                    {
+                      "op": "store",
+                      "args": ["arr1", "i * n + j", "val2"]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }]
+  }
+}

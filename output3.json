@@ -1,0 +1,129 @@
+{
+  "functions": [
+    {
+      "name": "matrix_operations",
+      "args": [
+        {
+          "name": "n",
+          "type": "int"
+        }
+      ],
+      "instrs": [
+        {
+          "op": "alloc",
+          "dest": "matrix1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              1023,
+              512
+            ]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "matrix2",
+          "type": {
+            "ptr": "int",
+            "size": [
+              511,
+              1024
+            ]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "result",
+          "type": {
+            "ptr": "int",
+            "size": [
+              1023,
+              1024
+            ]
+          }
+        },
+        {
+          "op": "loop",
+          "args": [
+            "i",
+            "n"
+          ],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": [
+                  "j",
+                  "n"
+                ],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "loop",
+                      "args": [
+                        "k",
+                        "n"
+                      ],
+                      "body": {
+                        "instrs": [
+                          {
+                            "op": "load",
+                            "dest": "m1val",
+                            "args": [
+                              "matrix1",
+                              "i * 511 + k"
+                            ]
+                          },
+                          {
+                            "op": "load",
+                            "dest": "m2val",
+                            "args": [
+                              "matrix2",
+                              "k * 1023 + j"
+                            ]
+                          },
+                          {
+                            "op": "mul",
+                            "dest": "prod",
+                            "args": [
+                              "m1val",
+                              "m2val"
+                            ]
+                          },
+                          {
+                            "op": "load",
+                            "dest": "current",
+                            "args": [
+                              "result",
+                              "i * 1023 + j"
+                            ]
+                          },
+                          {
+                            "op": "add",
+                            "dest": "newval",
+                            "args": [
+                              "current",
+                              "prod"
+                            ]
+                          },
+                          {
+                            "op": "store",
+                            "args": [
+                              "result",
+                              "i * 1023 + j",
+                              "newval"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
