@@ -77,25 +77,7 @@
                               "instrs": [
                                 {
                                   "op": "const",
-                                  "dest": "val_unroll_0",
-                                  "type": "int",
-                                  "value": 0
-                                },
-                                {
-                                  "op": "const",
-                                  "dest": "val_unroll_1",
-                                  "type": "int",
-                                  "value": 0
-                                },
-                                {
-                                  "op": "const",
-                                  "dest": "idx_unroll_0",
-                                  "type": "int",
-                                  "value": 0
-                                },
-                                {
-                                  "op": "const",
-                                  "dest": "new_val_unroll_1",
+                                  "dest": "new_val_unroll_0",
                                   "type": "int",
                                   "value": 0
                                 },
@@ -107,13 +89,7 @@
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "idx_unroll_2",
-                                  "type": "int",
-                                  "value": 0
-                                },
-                                {
-                                  "op": "const",
-                                  "dest": "new_val_unroll_2",
+                                  "dest": "new_val_unroll_1",
                                   "type": "int",
                                   "value": 0
                                 },
@@ -125,7 +101,31 @@
                                 },
                                 {
                                   "op": "const",
+                                  "dest": "idx_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
                                   "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "new_val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "idx_unroll_0",
                                   "type": "int",
                                   "value": 0
                                 },
@@ -137,13 +137,13 @@
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "idx_unroll_1",
+                                  "dest": "val_unroll_0",
                                   "type": "int",
                                   "value": 0
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "new_val_unroll_0",
+                                  "dest": "idx_unroll_2",
                                   "type": "int",
                                   "value": 0
                                 },
@@ -298,7 +298,7 @@
               },
               {
                 "op": "const",
-                "dest": "offset_unroll_0",
+                "dest": "sum_unroll_2",
                 "type": "int",
                 "value": 0
               },
@@ -310,49 +310,13 @@
               },
               {
                 "op": "const",
-                "dest": "offset_unroll_2",
-                "type": "int",
-                "value": 0
-              },
-              {
-                "op": "const",
-                "dest": "val2_unroll_0",
-                "type": "int",
-                "value": 0
-              },
-              {
-                "op": "const",
-                "dest": "sum_unroll_1",
-                "type": "int",
-                "value": 0
-              },
-              {
-                "op": "const",
-                "dest": "val1_unroll_2",
-                "type": "int",
-                "value": 0
-              },
-              {
-                "op": "const",
-                "dest": "val1_unroll_0",
-                "type": "int",
-                "value": 0
-              },
-              {
-                "op": "const",
                 "dest": "sum_unroll_0",
                 "type": "int",
                 "value": 0
               },
               {
                 "op": "const",
-                "dest": "val1_unroll_1",
-                "type": "int",
-                "value": 0
-              },
-              {
-                "op": "const",
-                "dest": "val2_unroll_2",
+                "dest": "offset_unroll_2",
                 "type": "int",
                 "value": 0
               },
@@ -364,13 +328,25 @@
               },
               {
                 "op": "const",
-                "dest": "val2_unroll_3",
+                "dest": "val1_unroll_1",
                 "type": "int",
                 "value": 0
               },
               {
                 "op": "const",
-                "dest": "sum_unroll_2",
+                "dest": "val1_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val1_unroll_0",
                 "type": "int",
                 "value": 0
               },
@@ -382,13 +358,37 @@
               },
               {
                 "op": "const",
+                "dest": "sum_unroll_1",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
                 "dest": "val1_unroll_3",
                 "type": "int",
                 "value": 0
               },
               {
                 "op": "const",
+                "dest": "offset_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
                 "dest": "offset_unroll_3",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_3",
                 "type": "int",
                 "value": 0
               },

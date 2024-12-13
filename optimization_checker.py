@@ -67,9 +67,9 @@ def detect_loop_unrolling(json_obj: Dict[str, Any]) -> Tuple[bool, List[str]]:
     return has_unrolling, unrolled_loops
 
 def compare_files():
-    with open('input6.json', 'r') as f:
+    with open('input3.json', 'r') as f:
         input_json = json.load(f)
-    with open('output6.json', 'r') as f:
+    with open('output3.json', 'r') as f:
         output_json = json.load(f)
     
     print("Input program structure:")

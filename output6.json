@@ -1,0 +1,450 @@
+{
+  "functions": [
+    {
+      "name": "complex_matrix_ops",
+      "args": [
+        {
+          "name": "matrix_a",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "matrix_b",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "vector_x",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "n",
+          "type": "int"
+        }
+      ],
+      "instrs": [
+        {
+          "op": "alloc",
+          "dest": "result_matrix_1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              512,
+              512
+            ]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "temp_vector_1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              512
+            ]
+          }
+        },
+        {
+          "op": "const",
+          "dest": "alpha_1",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "op": "const",
+          "dest": "beta_1",
+          "type": "int",
+          "value": 3
+        },
+        {
+          "op": "loop",
+          "args": [
+            "i_tile",
+            "0",
+            "512",
+            "48"
+          ],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": [
+                  "i_tile",
+                  "0",
+                  "512",
+                  "48"
+                ],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "loop",
+                      "args": [
+                        "i",
+                        "i_tile",
+                        "min(i_tile + 48, 512)",
+                        "1"
+                      ],
+                      "body": {
+                        "instrs": [
+                          {
+                            "op": "loop",
+                            "args": [
+                              "i",
+                              "i_tile",
+                              "min(i_tile + 48, 512)",
+                              "1"
+                            ],
+                            "body": {
+                              "instrs": [
+                                {
+                                  "op": "const",
+                                  "dest": "beta_x_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "result_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "result_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "result_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "beta_x_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "x_val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "scaled_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "result_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "x_val_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "beta_x_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "scaled_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "x_val_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "x_val_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "scaled_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "beta_x_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "scaled_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 0)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "scaled_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "alpha"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "x_val_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "vector_x",
+                                    "(i + 0)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "beta_x_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "x_val",
+                                    "beta"
+                                  ]
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "result_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "scaled",
+                                    "beta_x"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 0)",
+                                    "result"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 1)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "scaled_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "alpha"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "x_val_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "vector_x",
+                                    "(i + 1)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "beta_x_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "x_val",
+                                    "beta"
+                                  ]
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "result_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "scaled",
+                                    "beta_x"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 1)",
+                                    "result"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 2)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "scaled_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "alpha"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "x_val_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "vector_x",
+                                    "(i + 2)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "beta_x_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "x_val",
+                                    "beta"
+                                  ]
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "result_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "scaled",
+                                    "beta_x"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 2)",
+                                    "result"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 3)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "scaled_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "alpha"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "x_val_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "vector_x",
+                                    "(i + 3)"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "beta_x_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "x_val",
+                                    "beta"
+                                  ]
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "result_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "scaled",
+                                    "beta_x"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "temp_vector",
+                                    "(i + 3)",
+                                    "result"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

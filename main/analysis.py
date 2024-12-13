@@ -1,8 +1,8 @@
 # analysis.py
 
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Set, Optional, NamedTuple, Tuple, Union
+from dataclasses import dataclass, field
 from collections import defaultdict
-from dataclasses import dataclass
 from data_structures import *
 
 @dataclass
@@ -21,109 +21,269 @@ class SSADefinition:
     defining_instr: Dict
     block_id: int
 
+
+@dataclass
+class BasicBlock:
+    id: int
+    instructions: List[Dict] = field(default_factory=list)
+    predecessors: Set[int] = field(default_factory=set)
+    successors: Set[int] = field(default_factory=set)
+    dominators: Set[int] = field(default_factory=set)
+    idom: Optional[int] = None
+    dom_frontier: Set[int] = field(default_factory=set)
+    loop_header: bool = False
+    loop_depth: int = 0
+    phi_nodes: List[Dict] = field(default_factory=list)
+
+class Edge(NamedTuple):
+    source: int
+    target: int
+    edge_type: str
+
 class CFGBuilder:
     def __init__(self):
         self.blocks: Dict[int, BasicBlock] = {}
         self.current_block_id = 0
+        self.edges: List[Edge] = []
+        self.entry_block_id: Optional[int] = None
+        self.exit_block_id: Optional[int] = None
         
     def build_cfg(self, instrs: List[Dict]) -> Dict[int, BasicBlock]:
-        """Build Control Flow Graph from instructions."""
+        """Build Control Flow Graph with enhanced analysis."""
+        self._reset()
         self._identify_leaders(instrs)
         self._create_edges()
+        self._add_entry_exit_blocks()
         self._compute_dominators()
+        self._identify_loops()
+        self._compute_dominance_frontier()
         return self.blocks
     
+    def _reset(self):
+        """Reset the builder state."""
+        self.blocks.clear()
+        self.edges.clear()
+        self.current_block_id = 0
+        self.entry_block_id = None
+        self.exit_block_id = None
+
     def _identify_leaders(self, instrs: List[Dict]):
-        """Identify basic block leaders in the instruction stream."""
+        """Identify basic block leaders with enhanced criteria."""
         self.blocks.clear()
         current_block = None
         
         for i, instr in enumerate(instrs):
-            is_leader = (i == 0 or
-                        instr.get("op") in ["jmp", "br"] or
-                        i > 0 and instrs[i-1].get("op") in ["jmp", "br", "ret"] or
-                        "label" in instr)
+            is_leader = (
+                i == 0 or 
+                instr.get("op") in ["jmp", "br", "call"] or  # CF instructions
+                i > 0 and instrs[i-1].get("op") in ["jmp", "br", "ret", "call"] or  # After CF
+                "label" in instr or  # Labels
+                (i > 0 and "critical" in instr.get("labels", [])) or  # Critical section
+                (i > 0 and self._is_exception_boundary(instr))  # boundaries
+            )
             
             if is_leader:
                 self.current_block_id += 1
-                current_block = BasicBlock(
-                    id=self.current_block_id,
-                    instructions=[],
-                    predecessors=set(),
-                    successors=set(),
-                    dominators=set(),
-                    phi_nodes=[]
-                )
+                current_block = BasicBlock(id=self.current_block_id)
                 self.blocks[self.current_block_id] = current_block
+                
+                if self.entry_block_id is None:
+                    self.entry_block_id = self.current_block_id
             
             if current_block is not None:
                 current_block.instructions.append(instr)
-    
+
+    def _is_exception_boundary(self, instr: Dict) -> bool:
+        """Check if instruction marks exception handling boundary."""
+        return (
+            "try" in instr.get("labels", []) or
+            "catch" in instr.get("labels", []) or
+            "finally" in instr.get("labels", [])
+        )
+
     def _create_edges(self):
-        """Create edges between basic blocks based on control flow."""
+        """Create edges between basic blocks with type classification."""
         for block_id, block in self.blocks.items():
             if not block.instructions:
                 continue
-                
+            
             last_instr = block.instructions[-1]
             next_block_id = block_id + 1
             
+            # Handle different types of cf
             if last_instr.get("op") == "jmp":
-                target_label = last_instr.get("labels", [""])[0]
-                target_block = self._find_block_by_label(target_label)
-                if target_block:
-                    block.successors.add(target_block.id)
-                    target_block.predecessors.add(block_id)
-            
+                self._handle_jump(block_id, last_instr)
             elif last_instr.get("op") == "br":
-                for label in last_instr.get("labels", []):
-                    target_block = self._find_block_by_label(label)
-                    if target_block:
-                        block.successors.add(target_block.id)
-                        target_block.predecessors.add(block_id)
-            
-            elif last_instr.get("op") != "ret" and next_block_id in self.blocks:
-                block.successors.add(next_block_id)
-                self.blocks[next_block_id].predecessors.add(block_id)
-    
-    def _find_block_by_label(self, label: str) -> Optional[BasicBlock]:
-        """Find basic block containing given label."""
-        for block in self.blocks.values():
-            for instr in block.instructions:
-                if "label" in instr and instr["label"] == label:
-                    return block
-        return None
-    
+                self._handle_branch(block_id, last_instr)
+            elif last_instr.get("op") == "ret":
+                if self.exit_block_id:
+                    self._add_edge(block_id, self.exit_block_id, "fall-through")
+            else:
+                if next_block_id in self.blocks:
+                    self._add_edge(block_id, next_block_id, "fall-through")
+
+    def _handle_jump(self, block_id: int, instr: Dict):
+        """Handle unconditional jump instructions."""
+        target_label = instr.get("labels", [""])[0]
+        target_block = self._find_block_by_label(target_label)
+        if target_block:
+            edge_type = "back-edge" if target_block.id <= block_id else "branch"
+            self._add_edge(block_id, target_block.id, edge_type)
+
+    def _handle_branch(self, block_id: int, instr: Dict):
+        """Handle conditional branch instructions."""
+        for label in instr.get("labels", []):
+            target_block = self._find_block_by_label(label)
+            if target_block:
+                edge_type = "back-edge" if target_block.id <= block_id else "branch"
+                self._add_edge(block_id, target_block.id, edge_type)
+
+    def _add_edge(self, source: int, target: int, edge_type: str):
+        """Add edge with type classification."""
+        edge = Edge(source, target, edge_type)
+        self.edges.append(edge)
+        self.blocks[source].successors.add(target)
+        self.blocks[target].predecessors.add(source)
+
+    def _add_entry_exit_blocks(self):
+        """Add explicit entry and exit blocks."""
+        if not self.blocks:
+            return
+
+        if not self.entry_block_id:
+            self.current_block_id += 1
+            self.entry_block_id = self.current_block_id
+            self.blocks[self.entry_block_id] = BasicBlock(id=self.entry_block_id)
+            first_block = min(self.blocks.keys())
+            self._add_edge(self.entry_block_id, first_block, "fall-through")
+
+        self.current_block_id += 1
+        self.exit_block_id = self.current_block_id
+        self.blocks[self.exit_block_id] = BasicBlock(id=self.exit_block_id)
+        
+        for block_id, block in self.blocks.items():
+            if block.instructions and block.instructions[-1].get("op") == "ret":
+                self._add_edge(block_id, self.exit_block_id, "fall-through")
+
     def _compute_dominators(self):
-        """Compute dominator sets for all basic blocks."""
-        all_blocks = set(self.blocks.keys())
-        
-        # Initialize dominators
+        """Compute dominators using iterative data-flow algorithm."""
+        if not self.entry_block_id:
+            return
+
+        #  dominators
         for block in self.blocks.values():
-            block.dominators = all_blocks.copy()
+            block.dominators = set(self.blocks.keys())
         
-        entry_block = self.blocks.get(1)
-        if entry_block:
-            entry_block.dominators = {1}
+        entry_block = self.blocks[self.entry_block_id]
+        entry_block.dominators = {self.entry_block_id}
         
         changed = True
         while changed:
             changed = False
             for block_id, block in self.blocks.items():
-                if block_id == 1:
+                if block_id == self.entry_block_id:
                     continue
-                    
-                new_doms = {block_id}
-                pred_doms = [self.blocks[pred_id].dominators 
-                           for pred_id in block.predecessors 
-                           if pred_id in self.blocks]
                 
-                if pred_doms:
-                    new_doms.update(set.intersection(*pred_doms))
+                #Calculate new dominators from predecessors
+                new_doms = None
+                for pred_id in block.predecessors:
+                    pred_doms = self.blocks[pred_id].dominators
+                    if new_doms is None:
+                        new_doms = pred_doms.copy()
+                    else:
+                        new_doms &= pred_doms
+                
+                if new_doms is not None:
+                    new_doms = {block_id} | new_doms
+                    if new_doms != block.dominators:
+                        block.dominators = new_doms
+                        changed = True
+
+        # immediate dominators
+        self._compute_immediate_dominators()
+
+    def _compute_immediate_dominators(self):
+        """Compute immediate dominators for each block."""
+        for block in self.blocks.values():
+            dom_candidates = block.dominators - {block.id}
+            if dom_candidates:
+                idom = None
+                for dom_id in dom_candidates:
+                    if not any(
+                        dom_id in self.blocks[other_dom].dominators 
+                        for other_dom in dom_candidates 
+                        if other_dom != dom_id
+                    ):
+                        idom = dom_id
+                        break
+                block.idom = idom
+
+    def _identify_loops(self):
+        """Identify natural loops in the CFG."""
+        for edge in self.edges:
+            if edge.edge_type == "back-edge":
+                header = self.blocks[edge.target]
+                header.loop_header = True
+                
+                loop_nodes = self._find_natural_loop(edge.target, edge.source)
+                
+                for node_id in loop_nodes:
+                    self.blocks[node_id].loop_depth += 1
+
+    def _find_natural_loop(self, header_id: int, tail_id: int) -> Set[int]:
+        """Find all nodes in a natural loop."""
+        loop_nodes = {header_id, tail_id}
+        worklist = {tail_id}
+        
+        while worklist:
+            current = worklist.pop()
+            for pred_id in self.blocks[current].predecessors:
+                if pred_id not in loop_nodes:
+                    loop_nodes.add(pred_id)
+                    worklist.add(pred_id)
+        
+        return loop_nodes
+
+    def _compute_dominance_frontier(self):
+        """Compute dominance frontier for each block."""
+        for block in self.blocks.values():
+            if len(block.predecessors) >= 2:
+                for pred_id in block.predecessors:
+                    runner = pred_id
+                    while runner != block.idom and runner is not None:
+                        self.blocks[runner].dom_frontier.add(block.id)
+                        runner = self.blocks[runner].idom
+
+    def get_loop_nesting_forest(self) -> Dict[int, Set[int]]:
+        """Return the loop nesting forest structure."""
+        forest = defaultdict(set)
+        for block_id, block in self.blocks.items():
+            if block.loop_header:
+                current_id = block_id
+                max_depth = block.loop_depth
+                parent_header = None
+                
+                while current_id is not None:
+                    current = self.blocks[current_id]
+                    if current.loop_header and current.loop_depth < max_depth:
+                        parent_header = current_id
+                        break
+                    current_id = current.idom
+                
+                if parent_header is not None:
+                    forest[parent_header].add(block_id)
+                else:
+                    forest[None].add(block_id)
                     
-                if new_doms != block.dominators:
-                    block.dominators = new_doms
-                    changed = True
+        return dict(forest)
+
+    def get_dominator_tree(self) -> Dict[int, Set[int]]:
+        """Return the dominator tree structure."""
+        dom_tree = defaultdict(set)
+        for block_id, block in self.blocks.items():
+            if block.idom is not None:
+                dom_tree[block.idom].add(block_id)
+        return dict(dom_tree)
 
 class SSAConverter:
     def __init__(self):

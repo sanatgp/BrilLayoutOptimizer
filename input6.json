@@ -1,0 +1,195 @@
+{
+  "functions": [{
+    "name": "complex_matrix_ops",
+    "args": [
+      {"name": "matrix_a", "type": {"ptr": "int"}},
+      {"name": "matrix_b", "type": {"ptr": "int"}},
+      {"name": "vector_x", "type": {"ptr": "int"}},
+      {"name": "n", "type": "int"}
+    ],
+    "instrs": [
+      {
+        "op": "alloc",
+        "dest": "result_matrix",
+        "type": {
+          "ptr": "int",
+          "size": [512, 512]
+        }
+      },
+      {
+        "op": "alloc",
+        "dest": "temp_vector",
+        "type": {
+          "ptr": "int",
+          "size": [512]
+        }
+      },
+      {
+        "op": "const",
+        "dest": "alpha",
+        "type": "int",
+        "value": 2
+      },
+      {
+        "op": "const",
+        "dest": "beta",
+        "type": "int",
+        "value": 3
+      },
+      {
+        "op": "loop",
+        "args": ["i", "0", "512"],
+        "body": {
+          "instrs": [
+            {
+              "op": "mul",
+              "dest": "row_offset",
+              "type": "int",
+              "args": ["i", "512"]
+            },
+            {
+              "op": "loop",
+              "args": ["j", "0", "512"],
+              "body": {
+                "instrs": [
+                  {
+                    "op": "add",
+                    "dest": "idx",
+                    "type": "int",
+                    "args": ["row_offset", "j"]
+                  },
+                  {
+                    "op": "load",
+                    "dest": "a_val",
+                    "type": "int",
+                    "args": ["matrix_a", "idx"]
+                  },
+                  {
+                    "op": "load",
+                    "dest": "b_val",
+                    "type": "int",
+                    "args": ["matrix_b", "idx"]
+                  },
+                  {
+                    "op": "mul",
+                    "dest": "prod",
+                    "type": "int",
+                    "args": ["a_val", "b_val"]
+                  },
+                  {
+                    "op": "store",
+                    "args": ["result_matrix", "idx", "prod"]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "op": "loop",
+        "args": ["i", "0", "512"],
+        "body": {
+          "instrs": [
+            {
+              "op": "const",
+              "dest": "sum",
+              "type": "int",
+              "value": 0
+            },
+            {
+              "op": "loop",
+              "args": ["k", "0", "512"],
+              "body": {
+                "instrs": [
+                  {
+                    "op": "mul",
+                    "dest": "idx1",
+                    "type": "int",
+                    "args": ["i", "512"]
+                  },
+                  {
+                    "op": "add",
+                    "dest": "idx1",
+                    "type": "int",
+                    "args": ["idx1", "k"]
+                  },
+                  {
+                    "op": "load",
+                    "dest": "matrix_val",
+                    "type": "int",
+                    "args": ["result_matrix", "idx1"]
+                  },
+                  {
+                    "op": "load",
+                    "dest": "vec_val",
+                    "type": "int",
+                    "args": ["vector_x", "k"]
+                  },
+                  {
+                    "op": "mul",
+                    "dest": "prod",
+                    "type": "int",
+                    "args": ["matrix_val", "vec_val"]
+                  },
+                  {
+                    "op": "add",
+                    "dest": "sum",
+                    "type": "int",
+                    "args": ["sum", "prod"]
+                  }
+                ]
+              }
+            },
+            {
+              "op": "store",
+              "args": ["temp_vector", "i", "sum"]
+            }
+          ]
+        }
+      },
+      {
+        "op": "loop",
+        "args": ["i", "0", "512"],
+        "body": {
+          "instrs": [
+            {
+              "op": "load",
+              "dest": "val",
+              "type": "int",
+              "args": ["temp_vector", "i"]
+            },
+            {
+              "op": "mul",
+              "dest": "scaled",
+              "type": "int",
+              "args": ["val", "alpha"]
+            },
+            {
+              "op": "load",
+              "dest": "x_val",
+              "type": "int",
+              "args": ["vector_x", "i"]
+            },
+            {
+              "op": "mul",
+              "dest": "beta_x",
+              "type": "int",
+              "args": ["x_val", "beta"]
+            },
+            {
+              "op": "add",
+              "dest": "result",
+              "type": "int",
+              "args": ["scaled", "beta_x"]
+            },
+            {
+              "op": "store",
+              "args": ["temp_vector", "i", "result"]
+            }
+          ]
+        }
+      }
+    ]
+  }]
+}
