@@ -86,7 +86,7 @@ def main():
             cache_info.l1_size = args.cache_size
             
         analyzer = DataLayoutAnalyzer()
-        optimizer = LayoutOptimizer(analyzer, cache_info)  # Pass cache_info
+        optimizer = LayoutOptimizer(analyzer, cache_info) 
         
         
         logging.debug("Processing functions...")

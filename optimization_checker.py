@@ -1,8 +1,6 @@
-# optimization_checker.py
-
 import json
 import sys
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 def analyze_patterns(json_obj: Dict[str, Any], prefix: str = "") -> List[str]:
     patterns = []
@@ -25,10 +23,53 @@ def analyze_patterns(json_obj: Dict[str, Any], prefix: str = "") -> List[str]:
             
     return patterns
 
+def detect_loop_unrolling(json_obj: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    """Detect if loop unrolling has been applied and collect unrolled loop info."""
+    unrolled_loops = []
+    has_unrolling = False
+    
+    def analyze_loop_body(body: Dict, loop_var: str) -> bool:
+        """Check if a loop body shows signs of unrolling."""
+        instrs = body.get("instrs", [])
+        var_occurrences = set()
+        
+        for instr in instrs:
+            if "args" in instr:
+                for arg in instr["args"]:
+                    if isinstance(arg, str) and loop_var in arg:
+                        if f"({loop_var} +" in arg:
+                            var_occurrences.add(arg)
+        
+        # If we find multiple offset versions of the loop variable, it's likely unrolled
+        return len(var_occurrences) > 1
+    
+    def recursive_check(obj: Any) -> None:
+        nonlocal has_unrolling
+        if isinstance(obj, dict):
+            if obj.get("op") == "loop":
+                args = obj.get("args", [])
+                if args and "body" in obj:
+                    loop_var = args[0]
+                    if analyze_loop_body(obj["body"], loop_var):
+                        has_unrolling = True
+                        step = args[3] if len(args) > 3 else "1"
+                        unrolled_loops.append(
+                            f"Loop variable {loop_var} with step {step}"
+                        )
+            
+            for value in obj.values():
+                recursive_check(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                recursive_check(item)
+    
+    recursive_check(json_obj)
+    return has_unrolling, unrolled_loops
+
 def compare_files():
-    with open('input.json', 'r') as f:
+    with open('input6.json', 'r') as f:
         input_json = json.load(f)
-    with open('output.json', 'r') as f:
+    with open('output6.json', 'r') as f:
         output_json = json.load(f)
     
     print("Input program structure:")
@@ -45,6 +86,17 @@ def compare_files():
     output_loops = str(output_patterns)
     
     print("\nOptimization Analysis:")
+
+    input_unrolled, input_unroll_info = detect_loop_unrolling(input_json)
+    output_unrolled, output_unroll_info = detect_loop_unrolling(output_json)
+    
+    if not input_unrolled and output_unrolled:
+        print("✓ Loop unrolling detected")
+        print("  Unrolled loops found:")
+        for loop in output_unroll_info:
+            print(f"  - {loop}")
+    else:
+        print("✗ No loop unrolling applied")
     
     if "_tile" in output_loops and "_tile" not in input_loops:
         print("✓ Loop tiling detected")

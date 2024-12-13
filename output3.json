@@ -11,7 +11,7 @@
       "instrs": [
         {
           "op": "alloc",
-          "dest": "matrix1",
+          "dest": "matrix1_1",
           "type": {
             "ptr": "int",
             "size": [
@@ -22,7 +22,7 @@
         },
         {
           "op": "alloc",
-          "dest": "matrix2",
+          "dest": "matrix2_1",
           "type": {
             "ptr": "int",
             "size": [
@@ -33,7 +33,7 @@
         },
         {
           "op": "alloc",
-          "dest": "result",
+          "dest": "result_1",
           "type": {
             "ptr": "int",
             "size": [

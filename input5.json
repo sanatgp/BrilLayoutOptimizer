@@ -1,0 +1,141 @@
+{
+  "functions": [
+    {
+      "name": "vector_operations",
+      "args": [
+        {
+          "name": "input_array",
+          "type": {
+            "ptr": "int"
+          }
+        }
+      ],
+      "instrs": [
+        {
+          "op": "const",
+          "dest": "size",
+          "type": "int",
+          "value": 1024
+        },
+        {
+          "op": "alloc",
+          "dest": "output_array",
+          "type": {
+            "ptr": "int",
+            "size": [1024]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "temp_array",
+          "type": {
+            "ptr": "int",
+            "size": [1024]
+          }
+        },
+        {
+          "op": "const",
+          "dest": "zero",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "op": "const",
+          "dest": "one",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "op": "const",
+          "dest": "threshold",
+          "type": "int",
+          "value": 100
+        },
+        {
+          "op": "const",
+          "dest": "scale",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "op": "loop",
+          "args": ["i", "zero", "size"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "type": "int",
+                "args": ["input_array", "i"]
+              },
+              {
+                "op": "mul",
+                "dest": "val",
+                "type": "int",
+                "args": ["val", "scale"]
+              },
+              {
+                "op": "store",
+                "args": ["temp_array", "i", "val"]
+              }
+            ]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["i", "zero", "size"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "type": "int",
+                "args": ["temp_array", "i"]
+              },
+              {
+                "op": "lt",
+                "dest": "cond",
+                "type": "bool",
+                "args": ["val", "threshold"]
+              },
+              {
+                "op": "mul",
+                "dest": "val",
+                "type": "int",
+                "args": ["val", "scale"]
+              },
+              {
+                "op": "store",
+                "args": ["output_array", "i", "val"]
+              }
+            ]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["i", "zero", "size", "one"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "type": "int",
+                "args": ["output_array", "i"]
+              },
+              {
+                "op": "add",
+                "dest": "val",
+                "type": "int",
+                "args": ["val", "one"]
+              },
+              {
+                "op": "store",
+                "args": ["output_array", "i", "val"]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

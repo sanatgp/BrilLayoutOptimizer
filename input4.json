@@ -1,0 +1,125 @@
+{
+  "functions": [
+    {
+      "name": "matrix_operations",
+      "args": [
+        {
+          "name": "A",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "B",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "C",
+          "type": {
+            "ptr": "int"
+          }
+        }
+      ],
+      "instrs": [
+        {
+          "op": "const",
+          "dest": "size",
+          "type": "int",
+          "value": 1024
+        },
+        {
+          "op": "const",
+          "dest": "zero",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "op": "loop",
+          "args": ["i", "0", "16", "1"],
+          "body": {
+            "instrs": [
+              {
+                "op": "load",
+                "dest": "val",
+                "args": ["A", "i"],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": ["B", "i", "val"]
+              }
+            ]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["j", "0", "32", "1"],
+          "body": {
+            "instrs": [
+              {
+                "op": "mul",
+                "dest": "idx",
+                "args": ["j", "4"],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val",
+                "args": ["B", "idx"],
+                "type": "int"
+              },
+              {
+                "op": "add",
+                "dest": "new_val",
+                "args": ["val", "1"],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": ["C", "idx", "new_val"]
+              }
+            ]
+          }
+        },
+        {
+          "op": "loop",
+          "args": ["k", "0", "64", "1"],
+          "body": {
+            "instrs": [
+              {
+                "op": "mul",
+                "dest": "offset",
+                "args": ["k", "2"],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val1",
+                "args": ["A", "offset"],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val2",
+                "args": ["B", "offset"],
+                "type": "int"
+              },
+              {
+                "op": "add",
+                "dest": "sum",
+                "args": ["val1", "val2"],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": ["C", "offset", "sum"]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

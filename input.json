@@ -1,28 +1,94 @@
 {
   "functions": [{
-    "name": "extended_matmul",
+    "name": "complex_matrix_ops",
     "args": [
-      {"name": "A", "type": {"ptr": "int"}},
-      {"name": "B", "type": {"ptr": "int"}},
-      {"name": "C", "type": {"ptr": "int"}},
-      {"name": "D", "type": {"ptr": "int"}},
-      {"name": "n", "type": "int"}
+      {"name": "input", "type": {"ptr": "int"}},
+      {"name": "kernel", "type": {"ptr": "int"}},
+      {"name": "temp", "type": {"ptr": "int"}},
+      {"name": "output", "type": {"ptr": "int"}},
+      {"name": "matrix1", "type": {"ptr": "int"}},
+      {"name": "matrix2", "type": {"ptr": "int"}},
+      {"name": "n", "type": "int"},
+      {"name": "kernel_size", "type": "int"}
     ],
     "instrs": [
       {
         "op": "alloc",
-        "dest": "temp1",
+        "dest": "intermediate",
         "type": {
           "ptr": "int",
-          "size": [1024, 1024]
+          "size": [2048, 2048]
         }
       },
       {
         "op": "alloc",
-        "dest": "temp2",
+        "dest": "conv_result",
         "type": {
           "ptr": "int",
-          "size": [1024, 1024]
+          "size": [2048, 2048]
+        }
+      },
+      {
+        "op": "const",
+        "dest": "padding",
+        "type": "int",
+        "value": 1
+      },
+      {
+        "op": "loop",
+        "args": ["i", "n"],
+        "body": {
+          "instrs": [
+            {
+              "op": "loop",
+              "args": ["j", "n"],
+              "body": {
+                "instrs": [
+                  {
+                    "op": "store",
+                    "args": ["intermediate", "i * n + j", "0"]
+                  },
+                  {
+                    "op": "loop",
+                    "args": ["k", "n"],
+                    "body": {
+                      "instrs": [
+                        {
+                          "op": "load",
+                          "dest": "m1_val",
+                          "args": ["matrix1", "i * n + k"]
+                        },
+                        {
+                          "op": "load",
+                          "dest": "m2_val",
+                          "args": ["matrix2", "k * n + j"]
+                        },
+                        {
+                          "op": "mul",
+                          "dest": "prod",
+                          "args": ["m1_val", "m2_val"]
+                        },
+                        {
+                          "op": "load",
+                          "dest": "curr_sum",
+                          "args": ["intermediate", "i * n + j"]
+                        },
+                        {
+                          "op": "add",
+                          "dest": "new_sum",
+                          "args": ["curr_sum", "prod"]
+                        },
+                        {
+                          "op": "store",
+                          "args": ["intermediate", "i * n + j", "new_sum"]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       },
       {
@@ -37,111 +103,127 @@
                 "instrs": [
                   {
                     "op": "store",
-                    "args": ["temp1", "0"]
-                  },
-                  {
-                    "op": "store",
-                    "args": ["temp2", "0"]
+                    "args": ["conv_result", "i * n + j", "0"]
                   },
                   {
                     "op": "loop",
-                    "args": ["k", "n"],
+                    "args": ["ki", "kernel_size"],
                     "body": {
                       "instrs": [
                         {
-                          "op": "load",
-                          "dest": "aval",
-                          "args": ["A", "i * n + k"]
-                        },
-                        {
-                          "op": "load",
-                          "dest": "bval",
-                          "args": ["B", "k * n + j"]
-                        },
-                        {
-                          "op": "load",
-                          "dest": "dval",
-                          "args": ["D", "i * n + k"]
-                        },
-                        {
-                          "op": "mul",
-                          "dest": "prod1",
-                          "args": ["aval", "bval"]
-                        },
-                        {
-                          "op": "mul",
-                          "dest": "prod2",
-                          "args": ["dval", "bval"]
-                        },
-                        {
-                          "op": "load",
-                          "dest": "sum1",
-                          "args": ["temp1", "i * n + j"]
-                        },
-                        {
-                          "op": "load",
-                          "dest": "sum2",
-                          "args": ["temp2", "i * n + j"]
-                        },
-                        {
-                          "op": "add",
-                          "dest": "newsum1",
-                          "args": ["sum1", "prod1"]
-                        },
-                        {
-                          "op": "add",
-                          "dest": "newsum2",
-                          "args": ["sum2", "prod2"]
-                        },
-                        {
-                          "op": "store",
-                          "args": ["temp1", "i * n + j", "newsum1"]
-                        },
-                        {
-                          "op": "store",
-                          "args": ["temp2", "i * n + j", "newsum2"]
+                          "op": "loop",
+                          "args": ["kj", "kernel_size"],
+                          "body": {
+                            "instrs": [
+                              {
+                                "op": "sub",
+                                "dest": "ii",
+                                "args": ["i", "padding"]
+                              },
+                              {
+                                "op": "add",
+                                "dest": "row_idx",
+                                "args": ["ii", "ki"]
+                              },
+                              {
+                                "op": "sub",
+                                "dest": "jj",
+                                "args": ["j", "padding"]
+                              },
+                              {
+                                "op": "add",
+                                "dest": "col_idx",
+                                "args": ["jj", "kj"]
+                              },
+                              {
+                                "op": "mul",
+                                "dest": "kernel_row",
+                                "args": ["ki", "kernel_size"]
+                              },
+                              {
+                                "op": "add",
+                                "dest": "kernel_idx",
+                                "args": ["kernel_row", "kj"]
+                              },
+                              {
+                                "op": "mul",
+                                "dest": "input_row",
+                                "args": ["row_idx", "n"]
+                              },
+                              {
+                                "op": "add",
+                                "dest": "input_idx",
+                                "args": ["input_row", "col_idx"]
+                              },
+                              {
+                                "op": "load",
+                                "dest": "input_val",
+                                "args": ["intermediate", "input_idx"]
+                              },
+                              {
+                                "op": "load",
+                                "dest": "kernel_val",
+                                "args": ["kernel", "kernel_idx"]
+                              },
+                              {
+                                "op": "mul",
+                                "dest": "conv_prod",
+                                "args": ["input_val", "kernel_val"]
+                              },
+                              {
+                                "op": "load",
+                                "dest": "curr_conv",
+                                "args": ["conv_result", "i * n + j"]
+                              },
+                              {
+                                "op": "add",
+                                "dest": "new_conv",
+                                "args": ["curr_conv", "conv_prod"]
+                              },
+                              {
+                                "op": "store",
+                                "args": ["conv_result", "i * n + j", "new_conv"]
+                              }
+                            ]
+                          }
                         }
                       ]
                     }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "op": "loop",
+        "args": ["i", "n"],
+        "body": {
+          "instrs": [
+            {
+              "op": "loop",
+              "args": ["j", "n"],
+              "body": {
+                "instrs": [
+                  {
+                    "op": "load",
+                    "dest": "conv_val",
+                    "args": ["conv_result", "i * n + j"]
                   },
                   {
                     "op": "load",
-                    "dest": "res1",
-                    "args": ["temp1", "i * n + j"]
-                  },
-                  {
-                    "op": "load",
-                    "dest": "res2",
-                    "args": ["temp2", "i * n + j"]
+                    "dest": "input_val",
+                    "args": ["input", "i * n + j"]
                   },
                   {
                     "op": "add",
-                    "dest": "final_result",
-                    "args": ["res1", "res2"]
+                    "dest": "final_val",
+                    "args": ["conv_val", "input_val"]
                   },
                   {
                     "op": "store",
-                    "args": ["C", "i * n + j", "final_result"]
-                  },
-                  {
-                    "op": "if",
-                    "args": ["final_result"],
-                    "then": {
-                      "instrs": [
-                        {
-                          "op": "store",
-                          "args": ["C", "i * n + j", "0"]
-                        }
-                      ]
-                    },
-                    "else": {
-                      "instrs": [
-                        {
-                          "op": "store",
-                          "args": ["C", "i * n + j", "final_result"]
-                        }
-                      ]
-                    }
+                    "args": ["output", "i * n + j", "final_val"]
                   }
                 ]
               }

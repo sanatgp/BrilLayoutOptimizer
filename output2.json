@@ -1,3 +1,177 @@
 {
-  "functions": []
+  "functions": [
+    {
+      "name": "matrix_operations",
+      "args": [
+        {
+          "name": "input_matrix",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "matrix_b",
+          "type": {
+            "ptr": "int"
+          }
+        }
+      ],
+      "instrs": [
+        {
+          "op": "const",
+          "dest": "size_1",
+          "type": "int",
+          "value": 1024
+        },
+        {
+          "op": "alloc",
+          "dest": "result_matrix_1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              1024,
+              1024
+            ]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "temp_matrix_1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              1024,
+              1024
+            ]
+          }
+        },
+        {
+          "op": "const",
+          "dest": "zero_1",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "op": "const",
+          "dest": "one_1",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "op": "const",
+          "dest": "n_1",
+          "type": "int",
+          "value": 1024
+        },
+        {
+          "op": "loop",
+          "args": [
+            "i",
+            "zero_1",
+            "n_1"
+          ],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": [
+                  "j_tile",
+                  "0",
+                  "n",
+                  "32"
+                ],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "loop",
+                      "args": [
+                        "j_tile",
+                        "0",
+                        "n",
+                        "32"
+                      ],
+                      "body": {
+                        "instrs": [
+                          {
+                            "op": "loop",
+                            "args": [
+                              "j",
+                              "j_tile",
+                              "min(j_tile + 32, n)",
+                              "1"
+                            ],
+                            "body": {
+                              "instrs": [
+                                {
+                                  "op": "loop",
+                                  "args": [
+                                    "j",
+                                    "j_tile",
+                                    "min(j_tile + 32, n)",
+                                    "1"
+                                  ],
+                                  "body": {
+                                    "instrs": [
+                                      {
+                                        "op": "mul",
+                                        "dest": "idx",
+                                        "type": "int",
+                                        "args": [
+                                          "i",
+                                          "n"
+                                        ]
+                                      },
+                                      {
+                                        "op": "add",
+                                        "dest": "idx",
+                                        "type": "int",
+                                        "args": [
+                                          "idx",
+                                          "j"
+                                        ]
+                                      },
+                                      {
+                                        "op": "load",
+                                        "dest": "val",
+                                        "type": "int",
+                                        "args": [
+                                          "result_matrix",
+                                          "idx"
+                                        ]
+                                      },
+                                      {
+                                        "op": "mul",
+                                        "dest": "val",
+                                        "type": "int",
+                                        "args": [
+                                          "val",
+                                          "two"
+                                        ]
+                                      },
+                                      {
+                                        "op": "store",
+                                        "args": [
+                                          "temp_matrix",
+                                          "idx",
+                                          "val"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
 }

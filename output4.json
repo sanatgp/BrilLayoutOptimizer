@@ -1,0 +1,577 @@
+{
+  "functions": [
+    {
+      "name": "matrix_operations",
+      "args": [
+        {
+          "name": "A",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "B",
+          "type": {
+            "ptr": "int"
+          }
+        },
+        {
+          "name": "C",
+          "type": {
+            "ptr": "int"
+          }
+        }
+      ],
+      "instrs": [
+        {
+          "op": "const",
+          "dest": "size_1",
+          "type": "int",
+          "value": 1024
+        },
+        {
+          "op": "const",
+          "dest": "zero_1",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "op": "loop",
+          "args": [
+            "i_tile",
+            "0",
+            "16",
+            "48"
+          ],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": [
+                  "j_tile",
+                  "0",
+                  "32",
+                  "48"
+                ],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "loop",
+                      "args": [
+                        "i",
+                        "i_tile",
+                        "min(i_tile + 48, 16)",
+                        "1"
+                      ],
+                      "body": {
+                        "instrs": [
+                          {
+                            "op": "loop",
+                            "args": [
+                              "j",
+                              "j_tile",
+                              "min(j_tile + 48, 32)",
+                              "1"
+                            ],
+                            "body": {
+                              "instrs": [
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "idx_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "new_val_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "idx_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "new_val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "idx_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "new_val_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "idx_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "new_val_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "idx_unroll_0",
+                                  "args": [
+                                    "(j + 0)",
+                                    "4"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_0",
+                                  "args": [
+                                    "B",
+                                    "idx"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "new_val_unroll_0",
+                                  "args": [
+                                    "val",
+                                    "1"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "C",
+                                    "idx",
+                                    "new_val"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "idx_unroll_1",
+                                  "args": [
+                                    "(j + 1)",
+                                    "4"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_1",
+                                  "args": [
+                                    "B",
+                                    "idx"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "new_val_unroll_1",
+                                  "args": [
+                                    "val",
+                                    "1"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "C",
+                                    "idx",
+                                    "new_val"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "idx_unroll_2",
+                                  "args": [
+                                    "(j + 2)",
+                                    "4"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_2",
+                                  "args": [
+                                    "B",
+                                    "idx"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "new_val_unroll_2",
+                                  "args": [
+                                    "val",
+                                    "1"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "C",
+                                    "idx",
+                                    "new_val"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "idx_unroll_3",
+                                  "args": [
+                                    "(j + 3)",
+                                    "4"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_3",
+                                  "args": [
+                                    "B",
+                                    "idx"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "add",
+                                  "dest": "new_val_unroll_3",
+                                  "args": [
+                                    "val",
+                                    "1"
+                                  ],
+                                  "type": "int"
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "C",
+                                    "idx",
+                                    "new_val"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "op": "const",
+                "dest": "offset_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "offset_unroll_1",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "offset_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "sum_unroll_1",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val1_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val1_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "sum_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val1_unroll_1",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "sum_unroll_3",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_3",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "sum_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val2_unroll_1",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val1_unroll_3",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "offset_unroll_3",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "mul",
+                "dest": "offset_unroll_0",
+                "args": [
+                  "(k + 0)",
+                  "2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val1_unroll_0",
+                "args": [
+                  "A",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val2_unroll_0",
+                "args": [
+                  "B",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "add",
+                "dest": "sum_unroll_0",
+                "args": [
+                  "val1",
+                  "val2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": [
+                  "C",
+                  "offset",
+                  "sum"
+                ]
+              },
+              {
+                "op": "mul",
+                "dest": "offset_unroll_1",
+                "args": [
+                  "(k + 1)",
+                  "2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val1_unroll_1",
+                "args": [
+                  "A",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val2_unroll_1",
+                "args": [
+                  "B",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "add",
+                "dest": "sum_unroll_1",
+                "args": [
+                  "val1",
+                  "val2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": [
+                  "C",
+                  "offset",
+                  "sum"
+                ]
+              },
+              {
+                "op": "mul",
+                "dest": "offset_unroll_2",
+                "args": [
+                  "(k + 2)",
+                  "2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val1_unroll_2",
+                "args": [
+                  "A",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val2_unroll_2",
+                "args": [
+                  "B",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "add",
+                "dest": "sum_unroll_2",
+                "args": [
+                  "val1",
+                  "val2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": [
+                  "C",
+                  "offset",
+                  "sum"
+                ]
+              },
+              {
+                "op": "mul",
+                "dest": "offset_unroll_3",
+                "args": [
+                  "(k + 3)",
+                  "2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val1_unroll_3",
+                "args": [
+                  "A",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "load",
+                "dest": "val2_unroll_3",
+                "args": [
+                  "B",
+                  "offset"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "add",
+                "dest": "sum_unroll_3",
+                "args": [
+                  "val1",
+                  "val2"
+                ],
+                "type": "int"
+              },
+              {
+                "op": "store",
+                "args": [
+                  "C",
+                  "offset",
+                  "sum"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

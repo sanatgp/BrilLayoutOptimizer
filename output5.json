@@ -1,0 +1,435 @@
+{
+  "functions": [
+    {
+      "name": "vector_operations",
+      "args": [
+        {
+          "name": "input_array",
+          "type": {
+            "ptr": "int"
+          }
+        }
+      ],
+      "instrs": [
+        {
+          "op": "const",
+          "dest": "size_1",
+          "type": "int",
+          "value": 1024
+        },
+        {
+          "op": "alloc",
+          "dest": "output_array_1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              1024
+            ]
+          }
+        },
+        {
+          "op": "alloc",
+          "dest": "temp_array_1",
+          "type": {
+            "ptr": "int",
+            "size": [
+              1024
+            ]
+          }
+        },
+        {
+          "op": "const",
+          "dest": "zero_1",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "op": "const",
+          "dest": "one_1",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "op": "const",
+          "dest": "threshold_1",
+          "type": "int",
+          "value": 100
+        },
+        {
+          "op": "const",
+          "dest": "scale_1",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "op": "loop",
+          "args": [
+            "i_tile",
+            "0",
+            "1024",
+            "48"
+          ],
+          "body": {
+            "instrs": [
+              {
+                "op": "loop",
+                "args": [
+                  "i_tile",
+                  "0",
+                  "1024",
+                  "48"
+                ],
+                "body": {
+                  "instrs": [
+                    {
+                      "op": "loop",
+                      "args": [
+                        "i",
+                        "i_tile",
+                        "min(i_tile + 48, 1024)",
+                        "1"
+                      ],
+                      "body": {
+                        "instrs": [
+                          {
+                            "op": "loop",
+                            "args": [
+                              "i",
+                              "i_tile",
+                              "min(i_tile + 48, 1024)",
+                              "1"
+                            ],
+                            "body": {
+                              "instrs": [
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_3",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "cond_unroll_3",
+                                  "type": "bool",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "cond_unroll_1",
+                                  "type": "bool",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "cond_unroll_0",
+                                  "type": "bool",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "cond_unroll_2",
+                                  "type": "bool",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "const",
+                                  "dest": "val_unroll_0",
+                                  "type": "int",
+                                  "value": 0
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_array",
+                                    "(i + 0)"
+                                  ]
+                                },
+                                {
+                                  "op": "lt",
+                                  "dest": "cond_unroll_0",
+                                  "type": "bool",
+                                  "args": [
+                                    "val",
+                                    "threshold"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "val_unroll_0",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "scale"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "output_array",
+                                    "(i + 0)",
+                                    "val"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_array",
+                                    "(i + 1)"
+                                  ]
+                                },
+                                {
+                                  "op": "lt",
+                                  "dest": "cond_unroll_1",
+                                  "type": "bool",
+                                  "args": [
+                                    "val",
+                                    "threshold"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "scale"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "output_array",
+                                    "(i + 1)",
+                                    "val"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_array",
+                                    "(i + 2)"
+                                  ]
+                                },
+                                {
+                                  "op": "lt",
+                                  "dest": "cond_unroll_2",
+                                  "type": "bool",
+                                  "args": [
+                                    "val",
+                                    "threshold"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "val_unroll_2",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "scale"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "output_array",
+                                    "(i + 2)",
+                                    "val"
+                                  ]
+                                },
+                                {
+                                  "op": "load",
+                                  "dest": "val_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "temp_array",
+                                    "(i + 3)"
+                                  ]
+                                },
+                                {
+                                  "op": "lt",
+                                  "dest": "cond_unroll_3",
+                                  "type": "bool",
+                                  "args": [
+                                    "val",
+                                    "threshold"
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "dest": "val_unroll_3",
+                                  "type": "int",
+                                  "args": [
+                                    "val",
+                                    "scale"
+                                  ]
+                                },
+                                {
+                                  "op": "store",
+                                  "args": [
+                                    "output_array",
+                                    "(i + 3)",
+                                    "val"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "op": "const",
+                "dest": "val_unroll_0",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val_unroll_3",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val_unroll_2",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "const",
+                "dest": "val_unroll_1",
+                "type": "int",
+                "value": 0
+              },
+              {
+                "op": "load",
+                "dest": "val_unroll_0",
+                "type": "int",
+                "args": [
+                  "output_array",
+                  "(i + 0)"
+                ]
+              },
+              {
+                "op": "add",
+                "dest": "val_unroll_0",
+                "type": "int",
+                "args": [
+                  "val",
+                  "one"
+                ]
+              },
+              {
+                "op": "store",
+                "args": [
+                  "output_array",
+                  "(i + 0)",
+                  "val"
+                ]
+              },
+              {
+                "op": "load",
+                "dest": "val_unroll_1",
+                "type": "int",
+                "args": [
+                  "output_array",
+                  "(i + 1)"
+                ]
+              },
+              {
+                "op": "add",
+                "dest": "val_unroll_1",
+                "type": "int",
+                "args": [
+                  "val",
+                  "one"
+                ]
+              },
+              {
+                "op": "store",
+                "args": [
+                  "output_array",
+                  "(i + 1)",
+                  "val"
+                ]
+              },
+              {
+                "op": "load",
+                "dest": "val_unroll_2",
+                "type": "int",
+                "args": [
+                  "output_array",
+                  "(i + 2)"
+                ]
+              },
+              {
+                "op": "add",
+                "dest": "val_unroll_2",
+                "type": "int",
+                "args": [
+                  "val",
+                  "one"
+                ]
+              },
+              {
+                "op": "store",
+                "args": [
+                  "output_array",
+                  "(i + 2)",
+                  "val"
+                ]
+              },
+              {
+                "op": "load",
+                "dest": "val_unroll_3",
+                "type": "int",
+                "args": [
+                  "output_array",
+                  "(i + 3)"
+                ]
+              },
+              {
+                "op": "add",
+                "dest": "val_unroll_3",
+                "type": "int",
+                "args": [
+                  "val",
+                  "one"
+                ]
+              },
+              {
+                "op": "store",
+                "args": [
+                  "output_array",
+                  "(i + 3)",
+                  "val"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
