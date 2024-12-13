@@ -5,14 +5,6 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 from data_structures import *
 
-@dataclass
-class BasicBlock:
-    id: int
-    instructions: List[Dict]
-    predecessors: Set[int]
-    successors: Set[int]
-    dominators: Set[int]
-    phi_nodes: List[Dict]
 
 @dataclass
 class SSADefinition:
@@ -21,6 +13,11 @@ class SSADefinition:
     defining_instr: Dict
     block_id: int
 
+@dataclass
+class DominanceInfo:
+    idom: Optional[int] = None
+    dom_frontier: Set[int] = field(default_factory=set)
+    dominators: Set[int] = field(default_factory=set)
 
 @dataclass
 class BasicBlock:
@@ -28,12 +25,9 @@ class BasicBlock:
     instructions: List[Dict] = field(default_factory=list)
     predecessors: Set[int] = field(default_factory=set)
     successors: Set[int] = field(default_factory=set)
-    dominators: Set[int] = field(default_factory=set)
-    idom: Optional[int] = None
-    dom_frontier: Set[int] = field(default_factory=set)
-    loop_header: bool = False
-    loop_depth: int = 0
     phi_nodes: List[Dict] = field(default_factory=list)
+    dominance: DominanceInfo = field(default_factory=DominanceInfo)
+
 
 class Edge(NamedTuple):
     source: int
@@ -287,98 +281,155 @@ class CFGBuilder:
 
 class SSAConverter:
     def __init__(self):
-        self.var_versions: Dict[str, int] = defaultdict(int)
-        self.var_defs: Dict[str, List[SSADefinition]] = defaultdict(list)
-        self.current_definitions: Dict[str, SSADefinition] = {}
-    
+        self.blocks: Dict[int, BasicBlock] = {}
+        self.var_versions: DefaultDict[str, int] = defaultdict(int)
+        self.var_defs: DefaultDict[str, List[SSADefinition]] = defaultdict(list)
+        self.var_uses: DefaultDict[str, Set[int]] = defaultdict(set)
+        self.stack: DefaultDict[str, List[int]] = defaultdict(list)
+        
     def convert_to_ssa(self, cfg: Dict[int, BasicBlock]) -> Dict[int, BasicBlock]:
-        """Convert CFG to SSA form."""
-        # rename variables and add phi nodes
-        for block_id, block in cfg.items():
-            self._process_block(block)
-        
-        self._insert_phi_functions(cfg) #insert phi functions
-        
-        return cfg
+        """Convert CFG to SSA form using the standard algorithm."""
+        self.blocks = cfg
+        self._compute_variable_uses()
+        self._insert_phi_functions()
+        self._rename_variables()
+        return self.blocks
     
-    def _process_block(self, block: BasicBlock):
-        """Process instructions in a block to convert to SSA form."""
+    def _compute_variable_uses(self):
+        """Find all variables and their uses in the CFG."""
+        self.var_uses.clear()
+        for block in self.blocks.values():
+            self._find_block_variables(block)
+    
+    def _find_block_variables(self, block: BasicBlock):
+        """Find all variable definitions and uses in a block."""
         for instr in block.instructions:
             if "dest" in instr:
-                var_name = instr["dest"]
-                self.var_versions[var_name] += 1
-                version = self.var_versions[var_name]
-                
-                ssa_def = SSADefinition(
-                    var_name=var_name,
-                    version=version,
-                    defining_instr=instr,
-                    block_id=block.id
-                )
-                
-                instr["dest"] = f"{var_name}_{version}"
-                
-                self.var_defs[var_name].append(ssa_def)
-                self.current_definitions[var_name] = ssa_def
+                var = instr["dest"]
+                self.var_uses[var].add(block.id)
             
+            if "args" in instr:
+                for arg in instr["args"]:
+                    if isinstance(arg, str) and not arg.isdigit():
+                        self.var_uses[arg].add(block.id)
+    
+    def _insert_phi_functions(self):
+        """Insert phi functions using dominance frontier."""
+        for var in self.var_uses:
+            def_blocks = {block_id for block_id in self.var_uses[var]
+                         if any("dest" in instr and instr["dest"] == var 
+                              for instr in self.blocks[block_id].instructions)}
+            
+            # Calculate dominance frontier for phi placement
+            phi_blocks = set()
+            worklist = list(def_blocks)
+            while worklist:
+                block_id = worklist.pop()
+                df = self.blocks[block_id].dominance.dom_frontier
+                
+                for df_block_id in df:
+                    if df_block_id not in phi_blocks:
+                        phi_blocks.add(df_block_id)
+                        if df_block_id not in def_blocks:
+                            worklist.append(df_block_id)
+            
+            for block_id in phi_blocks:
+                self._insert_phi(var, block_id)
+    
+    def _insert_phi(self, var: str, block_id: int):
+        """Insert a phi function for a variable in a specific block."""
+        block = self.blocks[block_id]
+        
+        phi_node = {
+            "op": "phi",
+            "dest": var,  # will be renamed later
+            "args": ["_" for _ in block.predecessors], 
+            "labels": list(block.predecessors), 
+            "type": self._get_var_type(var)
+        }
+        
+        block.phi_nodes.append(phi_node)
+    
+    def _get_var_type(self, var: str) -> Optional[Dict]:
+        """Get the type of a variable from its definition."""
+        for block in self.blocks.values():
+            for instr in block.instructions:
+                if "dest" in instr and instr["dest"] == var:
+                    return instr.get("type")
+        return None
+    
+    def _rename_variables(self):
+        """Rename variables to SSA form using depth-first traversal."""
+        self.stack.clear()
+        entry_block_id = min(self.blocks.keys())
+        
+        self._rename_block(entry_block_id, set())
+    
+    def _rename_block(self, block_id: int, visited: Set[int]):
+        """Rename variables in a block and recursively process successors."""
+        if block_id in visited:
+            return
+        
+        block = self.blocks[block_id]
+        visited.add(block_id)
+        old_stack_sizes = {var: len(stack) for var, stack in self.stack.items()}
+        
+        # Rename phi nodes
+        for phi in block.phi_nodes:
+            var = phi["dest"]
+            new_version = self._new_version(var)
+            phi["dest"] = f"{var}_{new_version}"
+        
+        for instr in block.instructions:
             if "args" in instr:
                 new_args = []
                 for arg in instr["args"]:
-                    if isinstance(arg, str) and arg in self.current_definitions:
-                        curr_def = self.current_definitions[arg]
-                        new_args.append(f"{arg}_{curr_def.version}")
+                    if isinstance(arg, str) and not arg.isdigit():
+                        if self.stack[arg]:
+                            current_version = self.stack[arg][-1]
+                            new_args.append(f"{arg}_{current_version}")
+                        else:
+                            new_args.append(arg) 
                     else:
                         new_args.append(arg)
                 instr["args"] = new_args
-    
-    def _insert_phi_functions(self, cfg: Dict[int, BasicBlock]):
-        """Insert phi functions at necessary points in the CFG."""
-        for block in cfg.values():
-            if len(block.predecessors) > 1:
-                vars_needing_phi = self._find_vars_needing_phi(block, cfg)
-                
-                for var in vars_needing_phi:
-                    self.var_versions[var] += 1
-                    version = self.var_versions[var]
-                    
-                    phi_node = {
-                        "op": "phi",
-                        "dest": f"{var}_{version}",
-                        "args": [],
-                        "labels": []
-                    }
-                    
-                    for pred_id in block.predecessors:
-                        pred_block = cfg[pred_id]
-                        if var in self.current_definitions:
-                            pred_def = self._find_reaching_definition(var, pred_block)
-                            if pred_def:
-                                phi_node["args"].append(f"{var}_{pred_def.version}")
-                                phi_node["labels"].append(str(pred_id))
-                    
-                    if phi_node["args"]:
-                        block.phi_nodes.append(phi_node)
-    
-    def _find_vars_needing_phi(self, block: BasicBlock, cfg: Dict[int, BasicBlock]) -> Set[str]:
-        """Find variables that need phi functions at the start of a block."""
-        vars_needing_phi = set()
         
-        for pred_id in block.predecessors:
-            pred_block = cfg[pred_id]
-            for instr in pred_block.instructions:
-                if "dest" in instr:
-                    base_var = instr["dest"].split('_')[0]
-                    vars_needing_phi.add(base_var)
+            if "dest" in instr:
+                var = instr["dest"]
+                new_version = self._new_version(var)
+                instr["dest"] = f"{var}_{new_version}"
         
-        return vars_needing_phi
+        # Process successors and update their phi nodes
+        for succ_id in block.successors:
+            succ = self.blocks[succ_id]
+            pred_index = list(succ.predecessors).index(block_id)
+            
+            for phi in succ.phi_nodes:
+                var = phi["dest"].split('_')[0] 
+                if self.stack[var]: 
+                    phi["args"][pred_index] = f"{var}_{self.stack[var][-1]}"
+        
+        # Recursively process successors
+        for succ_id in block.successors:
+            self._rename_block(succ_id, visited)
+        
+        # Restore stack sizes
+        for var, size in old_stack_sizes.items():
+            while len(self.stack[var]) > size:
+                self.stack[var].pop()
     
-    def _find_reaching_definition(self, var: str, block: BasicBlock) -> Optional[SSADefinition]:
-        """Find the reaching definition of a variable at the end of a block."""
-        for instr in reversed(block.instructions):
-            if "dest" in instr and instr["dest"].split('_')[0] == var:
-                version = int(instr["dest"].split('_')[1])
-                return SSADefinition(var, version, instr, block.id)
-        return self.current_definitions.get(var)
+    def _new_version(self, var: str) -> int:
+        """Create new version number for a variable and update stack."""
+        self.var_versions[var] += 1
+        version = self.var_versions[var]
+        self.stack[var].append(version)
+        return version
+
+    def _is_critical_edge(self, pred_id: int, succ_id: int) -> bool:
+        """Check if edge between blocks is critical."""
+        pred = self.blocks[pred_id]
+        succ = self.blocks[succ_id]
+        return len(pred.successors) > 1 and len(succ.predecessors) > 1
 
 class IndexExpressionParser:
     def parse(self, expr: str) -> Tuple[List[str], Dict[str, int]]:
