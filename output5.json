@@ -103,13 +103,13 @@
                               "instrs": [
                                 {
                                   "op": "const",
-                                  "dest": "cond_unroll_0",
+                                  "dest": "cond_unroll_1",
                                   "type": "bool",
                                   "value": 0
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "cond_unroll_1",
+                                  "dest": "cond_unroll_3",
                                   "type": "bool",
                                   "value": 0
                                 },
@@ -121,7 +121,7 @@
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "cond_unroll_2",
+                                  "dest": "cond_unroll_0",
                                   "type": "bool",
                                   "value": 0
                                 },
@@ -139,14 +139,14 @@
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "cond_unroll_3",
-                                  "type": "bool",
+                                  "dest": "val_unroll_1",
+                                  "type": "int",
                                   "value": 0
                                 },
                                 {
                                   "op": "const",
-                                  "dest": "val_unroll_1",
-                                  "type": "int",
+                                  "dest": "cond_unroll_2",
+                                  "type": "bool",
                                   "value": 0
                                 },
                                 {
@@ -300,13 +300,13 @@
               },
               {
                 "op": "const",
-                "dest": "val_unroll_3",
+                "dest": "val_unroll_0",
                 "type": "int",
                 "value": 0
               },
               {
                 "op": "const",
-                "dest": "val_unroll_0",
+                "dest": "val_unroll_1",
                 "type": "int",
                 "value": 0
               },
@@ -318,7 +318,7 @@
               },
               {
                 "op": "const",
-                "dest": "val_unroll_1",
+                "dest": "val_unroll_3",
                 "type": "int",
                 "value": 0
               },

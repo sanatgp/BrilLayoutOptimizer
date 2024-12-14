@@ -471,10 +471,20 @@ class IndexExpressionParser:
             print(f"Warning: Failed to parse index expression '{expr}': {e}")
             return [], {}
 
+@dataclass
+class ArrayAccess:
+    array_name: str
+    index_expr: str
+    version: int
+    block_id: int
+    defining_version: Optional[int] = None
+    loop_depth: int = 0
+    stride: Union[int, Dict[str, int]] = 0
+
 class DataLayoutAnalyzer:
     def __init__(self):
         self.array_info: Dict[str, ArrayInfo] = {}
-        self.memory_accesses: List[MemoryAccess] = []
+        self.array_versions: DefaultDict[str, List[ArrayAccess]] = defaultdict(list)
         self.loop_nest_info: Dict[int, LoopInfo] = {}
         self.expr_parser = IndexExpressionParser()
         self.cfg_builder = CFGBuilder()
@@ -484,212 +494,178 @@ class DataLayoutAnalyzer:
         print("\nStarting memory access pattern analysis...")
         self._reset_analysis()
         
-        #  build CFG and convert to SSA
         cfg = self.cfg_builder.build_cfg(func.instrs)
         print(f"Built CFG with {len(cfg)} basic blocks")
         ssa_cfg = self.ssa_converter.convert_to_ssa(cfg)
         print("Converted to SSA form")
         
         self._collect_array_declarations(func)
-        
-        self._analyze_memory_accesses_ssa(ssa_cfg)
-        
-        self._analyze_memory_accesses(func.instrs)
-        
-        patterns = self._determine_access_patterns()
-        
+        self._analyze_array_accesses_ssa(ssa_cfg)
+        patterns = self._determine_access_patterns_ssa()
         self._print_analysis_results(patterns)
         
         return patterns
     
     def _reset_analysis(self):
         self.array_info.clear()
-        self.memory_accesses.clear()
+        self.array_versions.clear()
         self.loop_nest_info.clear()
     
-    def _analyze_memory_accesses_ssa(self, cfg: Dict[int, BasicBlock]):
-        """Analyze memory accesses using SSA form for more precise analysis."""
+    def _analyze_array_accesses_ssa(self, cfg: Dict[int, BasicBlock]):
+        """Analyze array accesses using SSA form information."""
         for block in cfg.values():
             loop_depth = self._calculate_loop_depth(block, cfg)
             
-            #phi nodes first
             for phi in block.phi_nodes:
-                if phi["dest"].split('_')[0] in self.array_info:
-                    self._process_phi_node(phi, block.id, loop_depth)
+                base_name = phi["dest"].split('_')[0]
+                if base_name in self.array_info:
+                    self._process_phi_node_ssa(phi, block.id, loop_depth)
             
             for instr in block.instructions:
                 if instr.get("op") in ["load", "store"]:
-                    self._process_memory_access(instr, block.id, loop_depth)
-    def _analyze_memory_accesses(self, instrs: List[Dict], loop_depth: int = 0, 
-                               current_loop: Optional[LoopInfo] = None):
-        """Original loop analysis implementation"""
-        for instr in instrs:
-            op = instr.get("op")
-            
-            if op in ["load", "store"]:
-                args = instr.get("args", [])
-                if len(args) >= 2:
-                    array_name = args[0]
-                    index_expr = str(args[1])
-                    print(f"Analyzing array access: {array_name}[{index_expr}]")
-
-                    loop_vars, var_strides = self.expr_parser.parse(index_expr)
-                    access = MemoryAccess(
-                        variable=array_name,
-                        index_expr=index_expr,
-                        line_number=instr.get("pos", {}).get("line", 0),
-                        loop_depth=loop_depth,
-                        stride=0, 
-                        loop_vars=loop_vars
-                    )
-
-                    if current_loop:
-                        innermost_var = current_loop.var
-                        access.stride = var_strides.get(innermost_var, 0)
-                    else:
-                        access.stride = 0 
-
-                    if array_name in self.array_info:
-                        self.memory_accesses.append(access)
-                        self.array_info[array_name].total_accesses += 1
-                        self.array_info[array_name].stride_pattern.append(access.stride)
-                        print(f"Recorded {array_name} access with stride {access.stride}")
-            
-            elif op == "loop":
-                loop_info = self._parse_loop_info(instr, loop_depth, current_loop)
-                self.loop_nest_info[loop_depth] = loop_info
-                if "body" in instr:
-                    self._analyze_memory_accesses(
-                        instr["body"].get("instrs", []),
-                        loop_depth + 1,
-                        loop_info
-                    )
-
-    def _should_tile_loop(self, loop: Dict, patterns: Dict[str, ArrayInfo]) -> bool:
-        """Enhanced loop tiling detection"""
-        body_instrs = loop.get("body", {}).get("instrs", [])
+                    self._process_array_access_ssa(instr, block.id, loop_depth)
     
-        # nested loops
-        has_inner_loop = any(instr.get("op") == "loop" for instr in body_instrs)
-        if not has_inner_loop:
-            return False
-    
-        for instr in body_instrs:
-            if instr.get("op") in ["load", "store"]:
-                array_name = instr.get("args", [""])[0]
-                index_expr = str(instr.get("args", ["", ""])[1])
-                
-                #column-major access patterns
-                if "k*n" in index_expr or "n*k" in index_expr:
-                    print(f"Found column-major access in loop: {index_expr}")
-                    return True
-                
-                #array access pattern
-                if array_name in patterns:
-                    pattern = patterns[array_name].access_pattern
-                    if pattern in [AccessPattern.COLUMN_MAJOR, AccessPattern.STRIDED]:
-                        print(f"Found {pattern} access pattern in array {array_name}")
-                        return True
-    
-        return False
-    
-    def _parse_loop_info(self, instr: Dict, depth: int, 
-                        parent: Optional[LoopInfo]) -> LoopInfo:
-        args = instr.get("args", [])
-        if len(args) < 2:
-            raise ValueError(f"Invalid loop instruction: missing arguments: {instr}")
+    def _process_phi_node_ssa(self, phi: Dict, block_id: int, loop_depth: int):
+        """Process phi node with SSA version tracking."""
+        base_name = phi["dest"].split('_')[0]
+        curr_version = int(phi["dest"].split('_')[1])
         
-        var = args[0]
-        end = args[1]
-        start = 0
-        step = 1
-        
-        if len(args) > 2:
-            start = args[1]
-            end = args[2]
-        if len(args) > 3:
-            step = args[3]
-            
-        return LoopInfo(
-            var=var,
-            start=start,
-            end=end,
-            step=step,
-            body=instr.get("body", {}),
-            depth=depth,
-            parent=parent
+        phi_access = ArrayAccess(
+            array_name=base_name,
+            index_expr="phi",
+            version=curr_version,
+            block_id=block_id,
+            loop_depth=loop_depth
         )
-
-    def _calculate_loop_depth(self, block: BasicBlock, cfg: Dict[int, BasicBlock]) -> int:
-        """Calculate loop depth for a basic block."""
-        depth = 0
-        current_block = block
-        visited = set()
         
-        while current_block and current_block.id not in visited:
-            visited.add(current_block.id)
-            back_edges = [pred for pred in current_block.predecessors 
-                         if pred in current_block.dominators]
-            depth += len(back_edges)
-            
-            # Move to immediate dominator
-            dominator_id = min(current_block.dominators - {current_block.id}, default=None)
-            current_block = cfg.get(dominator_id) if dominator_id else None
+        for arg in phi["args"]:
+            if isinstance(arg, str) and '_' in arg:
+                prev_version = int(arg.split('_')[1])
+                phi_access.defining_version = prev_version
         
-        return depth
+        self.array_versions[base_name].append(phi_access)
     
-    def _process_phi_node(self, phi: Dict, block_id: int, loop_depth: int):
-        """Process phi node for array access pattern analysis."""
-        var_base = phi["dest"].split('_')[0]
-        if var_base in self.array_info:
-            self.array_info[var_base].total_accesses += 1
-            
-            prev_version = None
-            for arg in phi["args"]:
-                curr_version = int(arg.split('_')[1])
-                if prev_version is not None:
-                    stride = abs(curr_version - prev_version)
-                    self.array_info[var_base].stride_pattern.append(stride)
-                prev_version = curr_version
-    
-    def _process_memory_access(self, instr: Dict, block_id: int, loop_depth: int):
-        """Process memory access instruction with SSA information."""
+    def _process_array_access_ssa(self, instr: Dict, block_id: int, loop_depth: int):
+        """Process array access with SSA version information."""
         args = instr.get("args", [])
         if len(args) >= 2:
-            array_name = args[0].split('_')[0] 
+            array_ref = args[0]
+            if not isinstance(array_ref, str) or '_' not in array_ref:
+                return
+                
+            array_name, version = array_ref.split('_')
+            if array_name not in self.array_info:
+                return
+                
             index_expr = str(args[1])
+            curr_version = int(version)
             
-            if array_name in self.array_info:
-                loop_vars, var_strides = self.expr_parser.parse(index_expr)
-                
-                access = MemoryAccess(
-                    variable=array_name,
-                    index_expr=index_expr,
-                    line_number=instr.get("pos", {}).get("line", 0),
-                    loop_depth=loop_depth,
-                    stride=max(var_strides.values(), default=0),
-                    loop_vars=loop_vars
-                )
-                
-                self.memory_accesses.append(access)
-                self.array_info[array_name].total_accesses += 1
-                self.array_info[array_name].stride_pattern.append(access.stride)
+            loop_vars, var_strides = self.expr_parser.parse(index_expr)
+            
+            access = ArrayAccess(
+                array_name=array_name,
+                index_expr=index_expr,
+                version=curr_version,
+                block_id=block_id,
+                loop_depth=loop_depth,
+                stride=max(var_strides.values(), default=0) if var_strides else 0
+            )
+            
+            prev_accesses = [a for a in self.array_versions[array_name] 
+                           if a.version < curr_version]
+            if prev_accesses:
+                access.defining_version = max(a.version for a in prev_accesses)
+            
+            self.array_versions[array_name].append(access)
+            self.array_info[array_name].total_accesses += 1
     
-    def _print_analysis_results(self, patterns: Dict[str, ArrayInfo]):
-        """Print detailed analysis results."""
-        print("\nAnalysis Results:")
-        for name, info in patterns.items():
-            print(f"\nArray: {name}")
-            print(f"  Dimensions: {info.dimensions}")
-            print(f"  Total accesses: {info.total_accesses}")
-            print(f"  Access pattern: {info.access_pattern}")
-            print(f"  Stride pattern: {info.stride_pattern}")
-            print(f"  Element type: {info.element_type}")
-            if info.access_pattern == AccessPattern.RANDOM:
-                print("  Warning: Random access pattern detected")
-            elif info.access_pattern == AccessPattern.COLUMN_MAJOR:
-                print("  Note: Column-major access pattern may benefit from layout optimization")
-
+    def _determine_access_patterns_ssa(self) -> Dict[str, ArrayInfo]:
+        """Determine access patterns using SSA version information."""
+        print("\nDetermining access patterns using SSA analysis...")
+        
+        for name, info in self.array_info.items():
+            if name not in self.array_versions:
+                continue
+                
+            accesses = self.array_versions[name]
+            if not accesses:
+                continue
+            
+            try:
+                matrix_dim = int(info.dimensions[0]) if info.dimensions else 1024
+            except (IndexError, ValueError):
+                matrix_dim = 1024
+            
+            version_chains = self._build_version_chains(accesses)
+            chain_patterns = []
+            for chain in version_chains:
+                pattern = self._analyze_chain_pattern(chain, matrix_dim)
+                chain_patterns.append(pattern)
+            
+            if chain_patterns:
+                pattern_counts = Counter(chain_patterns)
+                dominant_pattern = pattern_counts.most_common(1)[0][0]
+                info.access_pattern = dominant_pattern
+                print(f"Array {name}: {dominant_pattern} (from SSA analysis)")
+        
+        return self.array_info
+    
+    def _build_version_chains(self, accesses: List[ArrayAccess]) -> List[List[ArrayAccess]]:
+        """Build chains of related SSA versions."""
+        chains = []
+        used_versions = set()
+        
+        for access in accesses:
+            if access.version in used_versions:
+                continue
+                
+            chain = []
+            current = access
+            while current:
+                chain.append(current)
+                used_versions.add(current.version)
+                next_accesses = [a for a in accesses 
+                               if a.defining_version == current.version
+                               and a.version not in used_versions]
+                current = next_accesses[0] if next_accesses else None
+            
+            if chain:
+                chains.append(chain)
+        
+        return chains
+    
+    def _analyze_chain_pattern(self, chain: List[ArrayAccess], 
+                             matrix_dim: int) -> AccessPattern:
+        """Analyze access pattern within a version chain."""
+        if not chain:
+            return AccessPattern.RANDOM
+        
+        strides = []
+        for access in chain:
+            if isinstance(access.stride, dict):
+                stride_val = max(access.stride.values(), default=0)
+            else:
+                stride_val = access.stride
+            if stride_val > 0:
+                strides.append(stride_val)
+        
+        if not strides:
+            return AccessPattern.RANDOM
+        
+        total = len(strides)
+        unit_strides = sum(1 for s in strides if s == 1)
+        large_strides = sum(1 for s in strides if s >= matrix_dim)
+        
+        row_ratio = unit_strides / total if total > 0 else 0
+        col_ratio = large_strides / total if total > 0 else 0
+        
+        if col_ratio >= 0.3:
+            return AccessPattern.COLUMN_MAJOR
+        elif row_ratio >= 0.3:
+            return AccessPattern.ROW_MAJOR
+        else:
+            return AccessPattern.STRIDED
+    
     def _collect_array_declarations(self, func: BrilFunction):
         """Collect array declarations and arguments with dynamic sizing."""
         for arg in func.args:
@@ -698,7 +674,7 @@ class DataLayoutAnalyzer:
                 self.array_info[arg.name] = ArrayInfo(
                     dimensions=dimensions,
                     access_pattern=AccessPattern.RANDOM,
-                   total_accesses=0,
+                    total_accesses=0,
                     stride_pattern=[],
                     element_type=arg.type.base
                 )
@@ -715,7 +691,7 @@ class DataLayoutAnalyzer:
                 self.array_info[name] = ArrayInfo(
                     dimensions=dimensions,
                     access_pattern=AccessPattern.RANDOM,
-                   total_accesses=0,
+                    total_accesses=0,
                     stride_pattern=[],
                     element_type=element_type
                 )
@@ -727,7 +703,6 @@ class DataLayoutAnalyzer:
             if isinstance(type_info, dict):
                 if "size" in type_info:
                     size = type_info["size"]
-                    # return a list of integers
                     if isinstance(size, list):
                         return [int(dim) for dim in size]
                     return [int(size)]
@@ -741,59 +716,34 @@ class DataLayoutAnalyzer:
             print(f"Warning: Error extracting dimensions: {e}")
             return []
 
-    def _determine_access_patterns(self) -> Dict[str, ArrayInfo]:
-        """Enhanced access pattern analysis for matrix operations."""
-        print("\nDetermining access patterns...")
-
-        for name, info in self.array_info.items():
-            if not info.stride_pattern:
-                continue
-
-            try:
-                matrix_dim = int(info.dimensions[0]) if info.dimensions else 1024
-                inner_dim = int(info.dimensions[1]) if len(info.dimensions) >= 2 else 1024
-            except (IndexError, ValueError):
-                matrix_dim = 1024
-                inner_dim = 1024
+    def _calculate_loop_depth(self, block: BasicBlock, cfg: Dict[int, BasicBlock]) -> int:
+        """Calculate loop depth for a basic block."""
+        depth = 0
+        current_block = block
+        visited = set()
         
-            strides = info.stride_pattern
-            n_accesses = len(strides)
-            if n_accesses == 0:
-                continue
-    
-            def compare_stride(stride, value):
-                if isinstance(stride, dict):
-                    return any(v == value for v in stride.values())
-                try:
-                    return int(stride) == value
-                except (TypeError, ValueError):
-                    return False
+        while current_block and current_block.id not in visited:
+            visited.add(current_block.id)
+            back_edges = [pred for pred in current_block.predecessors 
+                         if pred in current_block.dominators]
+            depth += len(back_edges)
+            
+            dominator_id = min(current_block.dominators - {current_block.id}, default=None)
+            current_block = cfg.get(dominator_id) if dominator_id else None
         
-            def is_large_stride(stride):
-                if isinstance(stride, dict):
-                    return any(v > matrix_dim for v in stride.values())
-                try:
-                    return int(stride) > matrix_dim
-                except (TypeError, ValueError):
-                    return False
+        return depth
     
-            row_major_strides = sum(1 for s in strides if compare_stride(s, 1))
-            col_major_strides = sum(1 for s in strides if compare_stride(s, matrix_dim))
-            large_strides = sum(1 for s in strides if is_large_stride(s))
-    
-        # ratios
-            row_ratio = row_major_strides / n_accesses if n_accesses > 0 else 0
-            col_ratio = col_major_strides / n_accesses if n_accesses > 0 else 0
-            large_ratio = large_strides / n_accesses if n_accesses > 0 else 0
-    
-            if col_ratio >= 0.3 or large_ratio >= 0.3:
-                info.access_pattern = AccessPattern.COLUMN_MAJOR
-                print(f"Array {name}: Column-major access (ratio: {col_ratio:.2f})")
-            elif row_ratio >= 0.3:
-                info.access_pattern = AccessPattern.ROW_MAJOR
-                print(f"Array {name}: Row-major access (ratio: {row_ratio:.2f})")
-            else:
-                info.access_pattern = AccessPattern.STRIDED
-                print(f"Array {name}: Strided access pattern")
-    
-        return self.array_info
+    def _print_analysis_results(self, patterns: Dict[str, ArrayInfo]):
+        """Print detailed analysis results."""
+        print("\nAnalysis Results:")
+        for name, info in patterns.items():
+            print(f"\nArray: {name}")
+            print(f"  Dimensions: {info.dimensions}")
+            print(f"  Total accesses: {info.total_accesses}")
+            print(f"  Access pattern: {info.access_pattern}")
+            print(f"  Stride pattern: {info.stride_pattern}")
+            print(f"  Element type: {info.element_type}")
+            if info.access_pattern == AccessPattern.RANDOM:
+                print("  Warning: Random access pattern detected")
+            elif info.access_pattern == AccessPattern.COLUMN_MAJOR:
+                print("  Note: Column-major access pattern may benefit from layout optimization")
